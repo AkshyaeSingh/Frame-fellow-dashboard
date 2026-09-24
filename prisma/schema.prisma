@@ -1,0 +1,228 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+// Internal-only: Frame team + funders. Never exposed publicly.
+
+model Cohort {
+  id        String   @id @default(cuid())
+  slug      String   @unique // "cohort-1", "cohort-2"
+  name      String
+  startDate DateTime
+  endDate   DateTime
+  fellows   Fellow[]
+}
+
+model Fellow {
+  id          String  @id @default(cuid())
+  slug        String  @unique
+  name        String
+  cohortId    String
+  cohort      Cohort  @relation(fields: [cohortId], references: [id])
+  track       String? // Resident, Visiting, Amplifier, Independent
+  format      String? // Short form, Long form, Short film
+  hometown    String?
+  partnerOrg  String? // Amplifier-track org pairing
+  status      String? // Accepted, Visiting, Withdrew…
+  bio         String?
+  plannedOutput String?
+  email       String? // internal only; used to join form responses
+  notes       String?
+  // Self-reported counterfactual ("what would you have done without Frame?")
+  counterfactual String?
+  // Snapshot of the fellow's stated goals at intake
+  goals       String?
+
+  accounts  Account[]
+  posts     Post[]
+  outcomes  Outcome[]
+  responses FormResponse[]
+  trudy     TrudyReport[]
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+enum Platform {
+  YOUTUBE
+  TIKTOK
+  INSTAGRAM
+  X
+  LINKEDIN
+  SUBSTACK
+  PODCAST
+  OTHER
+}
+
+model Account {
+  id          String   @id @default(cuid())
+  fellowId    String
+  fellow      Fellow   @relation(fields: [fellowId], references: [id], onDelete: Cascade)
+  platform    Platform
+  handle      String
+  url         String?
+  externalId  String? // channelId / user id — stable across renames
+  displayName String?
+  bio         String?
+  avatarUrl   String?
+  isPrimary   Boolean  @default(false)
+  note        String? // e.g. "project channel", "side account"
+  lastScrapedAt DateTime?
+
+  snapshots AccountSnapshot[]
+  posts     Post[]
+
+  @@unique([platform, handle])
+}
+
+// Follower counts over time — the backbone of trajectory charts.
+model AccountSnapshot {
+  id         String   @id @default(cuid())
+  accountId  String
+  account    Account  @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  takenAt    DateTime
+  followers  Int?
+  following  Int?
+  postsCount Int?
+  totalViews BigInt?
+  source     String // "apify", "self-report:onboarding", "self-report:exit", "manual"
+  note       String?
+
+  @@index([accountId, takenAt])
+}
+
+model Post {
+  id          String    @id @default(cuid())
+  fellowId    String
+  fellow      Fellow    @relation(fields: [fellowId], references: [id], onDelete: Cascade)
+  accountId   String
+  account     Account   @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  platform    Platform
+  externalId  String
+  url         String?
+  kind        String? // video, short, reel, image, carousel, tweet, article
+  title       String?
+  caption     String?
+  publishedAt DateTime?
+  durationSec Int?
+  thumbnailUrl String?
+  views       Int?
+  likes       Int?
+  comments    Int?
+  shares      Int?
+  saves       Int?
+  transcript  String?
+  hashtags    String[]
+  mentions    String[]
+  links       String[]
+  isSponsored Boolean   @default(false)
+  collaborators String[]
+
+  // --- Analysis (rule-based pass fills these; LLM pass refines them) ---
+  aiSafetyScore Float? // 0..1 relevance to AI safety / governance
+  isAiSafety    Boolean @default(false)
+  topics        String[]
+  ctas          String[] // cta slugs, see lib/taxonomy
+  orgsMentioned String[] // orgs the content promotes or references
+  framing       String? // e.g. "alarm", "explainer", "hopeful", "political", "personal"
+  analysis      Json? // LLM output: summary, claims, accuracy, audience, etc.
+  analyzedAt    DateTime?
+  analyzedBy    String? // "rules-v1", "claude-…"
+
+  raw       Json?
+  updatedAt DateTime @updatedAt
+  createdAt DateTime @default(now())
+
+  @@unique([platform, externalId])
+  @@index([fellowId, publishedAt])
+}
+
+// Things that happened because of (or during) the work: press, collabs,
+// grants, jobs, events, virality, org partnerships, policy moments.
+model Outcome {
+  id          String   @id @default(cuid())
+  fellowId    String
+  fellow      Fellow   @relation(fields: [fellowId], references: [id], onDelete: Cascade)
+  date        DateTime?
+  type        String // press, collab, grant, job, event, viral, partnership, policy, audience, other
+  title       String
+  detail      String?
+  url         String?
+  source      String // "exit-survey", "manual", "scrape", "linkedin"
+  // Counterfactual attribution: would this have happened without Frame?
+  attribution String? // "direct", "contributed", "unrelated", "unknown"
+  evidence    String? // quote or reasoning behind the attribution
+  createdAt   DateTime @default(now())
+}
+
+// Trudy (or similar) creator-fit reports: fellow × brand/org/topic.
+model TrudyReport {
+  id              String   @id @default(cuid())
+  fellowId        String
+  fellow          Fellow   @relation(fields: [fellowId], references: [id], onDelete: Cascade)
+  against         String // brand / org / topic the fit is scored against
+  againstCategory String? // e.g. "AI safety native", "Safety-aligned mainstream"
+  platform        Platform?
+  reportDate      DateTime?
+  score           Int?
+  contentFit      Int?
+  audienceFit     Int?
+  persuasionFit   Int?
+  insights        String[]
+  contentNotes    String[]
+  audienceNotes   String[]
+  persuasionNotes String[]
+  metrics         Json? // followers, avg views, rates…
+  demographics    Json? // gender, age, countries
+  contentSummary  String?
+  brandSafety     Json?
+  expectedViews   Int?
+  estConversions  Int?
+  conversionRate  Float?
+  source          String   @default("manual") // "manual" (copied from Trudy UI) or "api"
+  externalId      String?  @unique // Trudy report ID once pulled via the Trudy API — lets syncs update in place
+  raw             Json? // full Trudy API payload, kept untouched
+  createdAt       DateTime @default(now())
+}
+
+// Curated answers from intake / onboarding / exit forms. Sensitive personal
+// fields (phone, emergency contacts, health, birthdays) are never imported.
+model FormResponse {
+  id          String   @id @default(cuid())
+  fellowId    String
+  fellow      Fellow   @relation(fields: [fellowId], references: [id], onDelete: Cascade)
+  form        String // "pre-questionnaire", "onboarding", "exit-survey"
+  submittedAt DateTime?
+  answers     Json // [{ q, a, group }]
+  createdAt   DateTime @default(now())
+
+  @@unique([fellowId, form])
+}
+
+model ScrapeRun {
+  id         String   @id @default(cuid())
+  platform   Platform
+  actor      String
+  runId      String   @unique
+  datasetId  String
+  status     String
+  items      Int      @default(0)
+  postsUpserted Int   @default(0)
+  note       String?
+  createdAt  DateTime @default(now())
+}
+
+// Anonymous, cohort-level survey responses (never linked to a fellow).
+model CohortSurvey {
+  id          String   @id @default(cuid())
+  cohortSlug  String
+  form        String
+  submittedAt DateTime?
+  answers     Json
+  createdAt   DateTime @default(now())
+}
