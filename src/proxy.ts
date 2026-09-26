@@ -1,11 +1,11 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { COOKIE, verifyRole } from "@/lib/session";
 
-// Everything is private. Only the login page and the Apify webhook (which
-// checks its own secret) are reachable without a valid session.
+// Everything is private. Only the login page, the Apify webhook and the
+// cron routes (each checks its own secret) are reachable without a valid session.
 export function proxy(req: NextRequest) {
   const { pathname } = req.nextUrl;
-  if (pathname === "/login" || pathname.startsWith("/api/apify-webhook")) return NextResponse.next();
+  if (pathname === "/login" || pathname.startsWith("/api/apify-webhook") || pathname.startsWith("/api/cron/")) return NextResponse.next();
   if (verifyRole(req.cookies.get(COOKIE)?.value)) return NextResponse.next();
   const url = new URL("/login", req.url);
   if (pathname !== "/") url.searchParams.set("next", pathname + req.nextUrl.search);

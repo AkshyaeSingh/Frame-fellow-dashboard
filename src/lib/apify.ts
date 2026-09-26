@@ -51,6 +51,18 @@ export const ACTORS: Partial<Record<Platform, { actor: string; costPerItem: numb
   },
 };
 
+// Comment scrapers, fed with post URLs.
+export const COMMENT_ACTORS: Partial<Record<Platform, { actor: string; input: (urls: string[]) => object }>> = {
+  YOUTUBE: {
+    actor: "streamers/youtube-comments-scraper",
+    input: (urls) => ({ startUrls: urls.map((url) => ({ url })), maxComments: 60, sortCommentsBy: "TOP_COMMENTS" }),
+  },
+  TIKTOK: {
+    actor: "clockworks/tiktok-comments-scraper",
+    input: (urls) => ({ postURLs: urls, commentsPerPost: 80, maxRepliesPerComment: 0 }),
+  },
+};
+
 // Instagram follower counts need a separate "details" run.
 export const IG_PROFILE_INPUT = (a: Acct[]) => ({
   directUrls: a.map((x) => x.url ?? `https://www.instagram.com/${x.handle.replace(/^@/, "")}/`),
@@ -59,10 +71,10 @@ export const IG_PROFILE_INPUT = (a: Acct[]) => ({
 
 const API = "https://api.apify.com/v2";
 
-export async function startRun(token: string, actor: string, input: object, webhookUrl?: string, platform?: Platform) {
+export async function startRun(token: string, actor: string, input: object, webhookUrl?: string, platform?: Platform, kind: "posts" | "comments" = "posts") {
   const qs = new URLSearchParams({ token });
   if (webhookUrl && platform) {
-    const hooks = [{ eventTypes: ["ACTOR.RUN.SUCCEEDED"], requestUrl: webhookUrl, payloadTemplate: `{"platform":"${platform}","resource":{{resource}}}` }];
+    const hooks = [{ eventTypes: ["ACTOR.RUN.SUCCEEDED"], requestUrl: webhookUrl, payloadTemplate: `{"platform":"${platform}","kind":"${kind}","resource":{{resource}}}` }];
     qs.set("webhooks", Buffer.from(JSON.stringify(hooks)).toString("base64"));
   }
   const res = await fetch(`${API}/acts/${actor.replace("/", "~")}/runs?${qs}`, {

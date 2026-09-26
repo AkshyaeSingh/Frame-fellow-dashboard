@@ -7,8 +7,9 @@ Internal dashboard for tracking everything Frame fellows publish, across platfor
 | Page | What's there |
 |---|---|
 | **Overview** `/` | Portfolio KPIs by cohort, weekly output chart with fellowship windows shaded, and a per-fellow table comparing before → during → after. Also cohort-level results from the anonymous exit survey. |
-| **Fellow** `/fellows/[slug]` | **Impact:** before/during/after scorecard, trajectory, followers, outcomes with counterfactual attribution, and the fellow's own counterfactual answers. **Content:** every post, with outlier multiplier, AI-safety score, topics, CTAs and orgs. **Messaging & CTAs:** topic, CTA and org mix before vs during, plus the claim-accuracy check. **Partner fit (Trudy):** Trudy reports per brand/org. **Forms:** curated intake, onboarding and exit answers. |
+| **Fellow** `/fellows/[slug]` | **Impact:** before/during/after scorecard, trajectory, followers, outcomes with counterfactual attribution, and the fellow's own counterfactual answers. **Content:** every post, with outlier multiplier, AI-safety score, topics, CTAs and orgs. **Messaging & CTAs:** topic, CTA and org mix before vs during, plus the claim-accuracy check. **Partner fit (Trudy):** Trudy reports per brand/org. **Audience response:** sentiment and signals (changed mind, learned, action intent, pushback, questions) across scraped comments, with the most-liked examples per signal and a per-post breakdown. **Forms:** curated intake, onboarding and exit answers. **Context & meetings** (team only): Granola meeting notes, decisions, action items and feedback on a timeline, plus follow-ups pulled from each meeting's next steps. |
 | **Content** `/content` | Search and filter every post across fellows, including transcripts. |
+| **Outliers** `/outliers` | Posts that beat or missed the creator's own normal (views ÷ median of their previous 20 posts), with the topics that are over-represented among them. |
 | **Methodology** `/methodology` | The seven metric layers, the counterfactual design, how each number is computed, and how this compares with what CreatorIQ, Modash, Trudy, Swayable and others track. Written for funders. |
 | **Data & scraping** `/data` | Team only. Tracked handles, Apify runs, dataset import, one-click scrape. |
 
@@ -78,7 +79,9 @@ The app deploys as-is to **Vercel** with a **Neon** Postgres database. It's the 
 ## Keeping it current
 
 - **Handles:** edit them on `/data`, or in `data/roster.ts` and re-seed.
-- **Schedule scrapes:** create one Apify schedule per platform with the webhook above. Weekly is enough for trajectories.
+- **Weekly automation (`vercel.json`):** Monday 06:00 UTC `/api/cron/weekly-scrape` starts Apify runs for the last 21 days of posts on every tracked account, plus comments on posts from the last 30 days. Each run calls `/api/apify-webhook` when it finishes, which imports it. Monday 15:00 UTC `/api/cron/digest` posts a summary to Slack: output, outliers, audience signals, quiet fellows, open action items and failed runs. Needs these Vercel env vars: `APIFY_TOKEN`, `PUBLIC_URL`, `WEBHOOK_SECRET`, `CRON_SECRET`, `SLACK_WEBHOOK_URL`. Preview the digest with `/api/cron/digest?dry=1&token=$CRON_SECRET`.
+- **Fellow context:** add notes on the fellow's Context tab, or bulk-import them with `npm run import:context -- --granola notes.json --notion "Final Fellows….csv"` (keep these files out of git).
+- **Comments:** `npm run import:comments -- YOUTUBE <datasetId>` for a one-off dataset, and `-- --reanalyze` after editing `src/lib/analysis/comments.ts`.
 - **Re-tag after editing `src/lib/taxonomy.ts`:** `npm run analyze`.
 - **Ground truth:** keep `data/ground-truth.md` curated; the accuracy check is only as good as that file.
 
@@ -87,4 +90,5 @@ The app deploys as-is to **Vercel** with a **Neon** Postgres database. It's the 
 - **Apify limit:** the free plan hit its monthly limit during the first backfill. Michaël's @TheInsideView and Mikey Posada's channel don't reach the baseline window yet, and the dashboard flags this as a "partial baseline".
 - **X:** limited to 10 tweets per run on the free plan, so Amina Green's X account isn't scraped yet.
 - **No handles yet:** Jessica Riches, Petr Salaba, Suzy Shepherd, Sara Polyweb, Stuart Harmon, Strad Slater, Jeremy Ornstein and Taeyong Kim.
-- **Phase 2:** comment scraping and sentiment; web and press mentions; LinkedIn career moves; a comparison group of non-fellow applicants.
+- **Comment tagging is keyword-based.** It's transparent but misses sarcasm, so treat rates as directional. An LLM pass is next.
+- **Phase 2:** web and press mentions; LinkedIn career moves; a comparison group of non-fellow applicants.

@@ -8,6 +8,7 @@ export default async function AppLayout({ children }: LayoutProps<"/">) {
   const nav = [
     { href: "/", label: "Overview" },
     { href: "/content", label: "Content" },
+    { href: "/outliers", label: "Outliers" },
     { href: "/methodology", label: "Methodology" },
     ...(role === "team" ? [{ href: "/data", label: "Data & scraping" }] : []),
   ];

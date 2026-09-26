@@ -4,8 +4,10 @@ import { revalidatePath } from "next/cache";
 import type { Platform } from "@prisma/client";
 import { db } from "@/lib/db";
 import { requireTeam } from "@/lib/auth";
-import { ACTORS, IG_PROFILE_INPUT, getRun, startRun } from "@/lib/apify";
+import { getRun } from "@/lib/apify";
+import { startCommentScrape, startPostScrape, webhookUrl } from "@/lib/scrape";
 import { fetchDataset, ingestItems } from "@/lib/ingest/store";
+import { importRun } from "@/lib/ingest/run";
 import { PLATFORM_LABEL } from "@/lib/taxonomy";
 
 export type Result = { ok?: string; error?: string } | undefined;
@@ -37,20 +39,9 @@ export async function startScrapeAction(_: Result, formData: FormData): Promise<
   if (!token) return { error: "APIFY_TOKEN is not set in .env — add it, or use the import form with a dataset ID." };
   const since = String(formData.get("since") || new Date(Date.now() - 45 * 86_400_000).toISOString().slice(0, 10));
   const perAccount = Number(formData.get("perAccount") || 30);
-  const webhook = process.env.PUBLIC_URL && process.env.WEBHOOK_SECRET ? `${process.env.PUBLIC_URL}/api/apify-webhook?token=${process.env.WEBHOOK_SECRET}` : undefined;
-  const accounts = await db.account.findMany({ select: { platform: true, handle: true, url: true } });
-  const started: string[] = [];
-  for (const [platform, cfg] of Object.entries(ACTORS) as [Platform, NonNullable<(typeof ACTORS)[Platform]>][]) {
-    const accts = accounts.filter((a) => a.platform === platform);
-    if (!accts.length) continue;
-    const run = await startRun(token, cfg.actor, cfg.input(accts, since, perAccount), webhook, platform);
-    await db.scrapeRun.create({ data: { runId: run.id, datasetId: run.defaultDatasetId, platform, actor: cfg.actor, status: run.status } });
-    started.push(`${PLATFORM_LABEL[platform]} (${accts.length})`);
-    if (platform === "INSTAGRAM") {
-      const p = await startRun(token, cfg.actor, IG_PROFILE_INPUT(accts), webhook, platform);
-      await db.scrapeRun.create({ data: { runId: p.id, datasetId: p.defaultDatasetId, platform, actor: `${cfg.actor} (profiles)`, status: p.status } });
-    }
-  }
+  const started = await startPostScrape(token, since, perAccount);
+  if (formData.get("comments")) started.push(...(await startCommentScrape(token)));
+  const webhook = webhookUrl();
   revalidatePath("/data");
   return { ok: `Started: ${started.join(", ")}. Use “Check & import” when they finish${webhook ? " (or the webhook will import automatically)" : ""}.` };
 }
@@ -64,7 +55,7 @@ export async function syncRunsAction(): Promise<void> {
     const run = await getRun(token, r.runId);
     if (run.status === "SUCCEEDED") {
       const items = await fetchDataset(r.datasetId, token);
-      const rep = await ingestItems(db, r.platform, items, { fetchTranscripts: true });
+      const rep = await importRun(db, r.platform, r.actor.includes("comments") ? "comments" : "posts", items);
       await db.scrapeRun.update({ where: { id: r.id }, data: { status: "IMPORTED", items: items.length, postsUpserted: rep.posts } });
     } else if (run.status !== r.status) {
       await db.scrapeRun.update({ where: { id: r.id }, data: { status: run.status } });

@@ -46,6 +46,9 @@ export function ScrapeForm({ disabled }: { disabled: boolean }) {
           Max per account
           <input name="perAccount" type="number" defaultValue={30} className={`${inp} block w-24`} />
         </label>
+        <label className="flex h-8 items-center gap-1.5 text-xs text-muted-foreground">
+          <input name="comments" type="checkbox" defaultChecked /> + comments on recent posts
+        </label>
         <button disabled={disabled || pending} className="h-8 rounded-md bg-primary px-3 text-sm text-primary-foreground disabled:opacity-50">
           {pending ? "Starting…" : "Start scrape"}
         </button>

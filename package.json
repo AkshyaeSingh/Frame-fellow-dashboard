@@ -12,7 +12,9 @@
     "import:apify": "tsx scripts/import-apify.ts",
     "analyze": "tsx scripts/analyze.ts",
     "analyze:llm": "tsx scripts/analyze-llm.ts",
-    "db:migrate": "prisma migrate deploy"
+    "db:migrate": "prisma migrate deploy",
+    "import:comments": "tsx scripts/import-comments.ts",
+    "import:context": "tsx scripts/import-context.ts"
   },
   "prisma": {
     "seed": "tsx prisma/seed.ts"

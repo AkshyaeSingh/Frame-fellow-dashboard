@@ -155,3 +155,38 @@ export async function saveNotesAction(fellowId: string, formData: FormData) {
   await db.fellow.update({ where: { id: fellowId }, data: { notes: s(formData.get("notes")) } });
   await refresh(fellowId);
 }
+
+// ---------- Fellow context (meetings, decisions, action items) ----------
+
+export async function addNoteAction(fellowId: string, formData: FormData) {
+  await requireTeam();
+  const title = s(formData.get("title"));
+  if (!title) return;
+  const date = s(formData.get("date"));
+  await db.fellowNote.create({
+    data: {
+      fellowId,
+      title,
+      kind: s(formData.get("kind")) ?? "note",
+      body: s(formData.get("body")),
+      url: s(formData.get("url")),
+      date: date ? new Date(date) : new Date(),
+      author: s(formData.get("author")),
+      source: s(formData.get("url"))?.includes("granola.ai") ? "granola" : "manual",
+    },
+  });
+  await refresh(fellowId);
+}
+
+export async function toggleNoteAction(id: string, field: "done" | "pinned") {
+  await requireTeam();
+  const cur = await db.fellowNote.findUniqueOrThrow({ where: { id }, select: { done: true, pinned: true } });
+  const n = await db.fellowNote.update({ where: { id }, data: { [field]: !cur[field] } });
+  await refresh(n.fellowId);
+}
+
+export async function deleteNoteAction(id: string) {
+  await requireTeam();
+  const n = await db.fellowNote.delete({ where: { id } });
+  await refresh(n.fellowId);
+}

@@ -42,6 +42,8 @@ model Fellow {
   accounts  Account[]
   posts     Post[]
   outcomes  Outcome[]
+  context   FellowNote[]
+  commentsReceived Comment[]
   responses FormResponse[]
   trudy     TrudyReport[]
   createdAt DateTime @default(now())
@@ -137,9 +139,59 @@ model Post {
   raw       Json?
   updatedAt DateTime @updatedAt
   createdAt DateTime @default(now())
+  commentList Comment[]
+  commentsScrapedAt DateTime?
 
   @@unique([platform, externalId])
   @@index([fellowId, publishedAt])
+}
+
+// Audience comments on fellows' posts — resonance, pushback, questions,
+// "changed my mind" and "I did something" signals.
+model Comment {
+  id          String    @id @default(cuid())
+  postId      String
+  post        Post      @relation(fields: [postId], references: [id], onDelete: Cascade)
+  fellowId    String
+  fellow      Fellow    @relation(fields: [fellowId], references: [id], onDelete: Cascade)
+  platform    Platform
+  externalId  String
+  author      String?
+  text        String
+  likes       Int?
+  replies     Int?
+  isReply     Boolean   @default(false)
+  isCreator   Boolean   @default(false) // the fellow replying on their own post
+  publishedAt DateTime?
+  sentiment   String? // positive | negative | neutral | mixed
+  signals     String[] // see lib/analysis/comments.ts
+  analyzedBy  String?
+  createdAt   DateTime  @default(now())
+
+  @@unique([platform, externalId])
+  @@index([fellowId])
+  @@index([postId])
+}
+
+// Team context on each fellow: meeting notes (e.g. Granola), decisions,
+// action items, feedback. Internal only — never shown in the funder view.
+model FellowNote {
+  id        String   @id @default(cuid())
+  fellowId  String
+  fellow    Fellow   @relation(fields: [fellowId], references: [id], onDelete: Cascade)
+  date      DateTime?
+  kind      String // meeting | decision | action | feedback | note
+  title     String
+  body      String?
+  url       String? // e.g. Granola share link
+  source    String   @default("manual") // manual | granola | notion | slack
+  author    String?
+  pinned    Boolean  @default(false)
+  done      Boolean  @default(false) // for action items
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([fellowId, date])
 }
 
 // Things that happened because of (or during) the work: press, collabs,

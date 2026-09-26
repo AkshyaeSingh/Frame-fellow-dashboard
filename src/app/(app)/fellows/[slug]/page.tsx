@@ -15,6 +15,8 @@ import { ContentTab } from "./content-tab";
 import { MessagingTab } from "./messaging-tab";
 import { TrudyTab } from "./trudy-tab";
 import { FormsTab } from "./forms-tab";
+import { AudienceTab } from "./audience-tab";
+import { ContextTab } from "./context-tab";
 
 export async function generateMetadata(props: PageProps<"/fellows/[slug]">): Promise<Metadata> {
   const { slug } = await props.params;
@@ -26,8 +28,10 @@ const TABS = [
   { key: "overview", label: "Impact" },
   { key: "content", label: "Content" },
   { key: "messaging", label: "Messaging & CTAs" },
+  { key: "audience", label: "Audience response" },
   { key: "trudy", label: "Partner fit (Trudy)" },
   { key: "forms", label: "Forms & self-reports" },
+  { key: "context", label: "Context & meetings", teamOnly: true },
 ] as const;
 
 export default async function FellowPage(props: PageProps<"/fellows/[slug]">) {
@@ -36,9 +40,10 @@ export default async function FellowPage(props: PageProps<"/fellows/[slug]">) {
   const sp = await props.searchParams;
   const f = await getFellow(slug);
   if (!f) notFound();
-  const tab = TABS.find((t) => t.key === sp.tab)?.key ?? "overview";
-  const cmp = compareWindows(f.posts as PostLike[], f.cohort.startDate, f.cohort.endDate);
   const isTeam = role === "team";
+  const tabs = TABS.filter((t) => isTeam || !("teamOnly" in t));
+  const tab = tabs.find((t) => t.key === sp.tab)?.key ?? "overview";
+  const cmp = compareWindows(f.posts as PostLike[], f.cohort.startDate, f.cohort.endDate);
 
   return (
     <div className="space-y-6">
@@ -84,7 +89,7 @@ export default async function FellowPage(props: PageProps<"/fellows/[slug]">) {
       </header>
 
       <nav className="flex gap-1 overflow-x-auto border-b">
-        {TABS.map((t) => (
+        {tabs.map((t) => (
           <Link
             key={t.key}
             href={t.key === "overview" ? `/fellows/${f.slug}` : `/fellows/${f.slug}?tab=${t.key}`}
@@ -101,6 +106,8 @@ export default async function FellowPage(props: PageProps<"/fellows/[slug]">) {
       {tab === "messaging" && <MessagingTab f={f} />}
       {tab === "trudy" && <TrudyTab f={f} isTeam={isTeam} />}
       {tab === "forms" && <FormsTab f={f} isTeam={isTeam} />}
+      {tab === "audience" && <AudienceTab fellowId={f.id} />}
+      {tab === "context" && isTeam && <ContextTab fellowId={f.id} />}
     </div>
   );
 }
