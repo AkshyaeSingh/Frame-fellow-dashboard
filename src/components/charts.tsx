@@ -3,6 +3,7 @@
 import {
   Bar,
   BarChart,
+  ComposedChart,
   CartesianGrid,
   Line,
   LineChart,
@@ -189,5 +190,50 @@ export function ShareBars({ rows, total, color = "var(--s1)" }: { rows: { label:
         </li>
       ))}
     </ul>
+  );
+}
+
+// Posts per program week: long + short actuals stacked, planned total as a step line.
+export function CadenceChart({ data, height = 200 }: { data: { week: number; long: number; short: number; target: number | null; current: boolean }[]; height?: number }) {
+  const LONG = "var(--s1)";
+  const SHORT = "var(--s3)";
+  const TARGET = "var(--muted-foreground)";
+  return (
+    <div>
+      <Legend
+        items={[
+          { label: "Long-form", color: LONG },
+          { label: "Short-form", color: SHORT },
+          { label: "Planned (long + short)", color: TARGET },
+        ]}
+      />
+      <ResponsiveContainer width="100%" height={height}>
+        <ComposedChart data={data} margin={{ top: 4, right: 4, bottom: 0, left: -20 }} barCategoryGap="25%">
+          <CartesianGrid vertical={false} stroke={GRID} />
+          <XAxis dataKey="week" tick={AXIS} tickLine={false} axisLine={false} tickFormatter={(w) => `W${w}`} />
+          <YAxis tick={AXIS} tickLine={false} axisLine={false} allowDecimals={false} />
+          <Tooltip
+            cursor={{ fill: "var(--muted)", opacity: 0.5 }}
+            content={({ active, payload }) => {
+              if (!active || !payload?.length) return null;
+              const d = payload[0]!.payload as (typeof data)[number];
+              return (
+                <TipBox
+                  title={`Week ${d.week}${d.current ? " (this week)" : ""}`}
+                  rows={[
+                    { label: "Long-form", value: String(d.long), color: LONG },
+                    { label: "Short-form", value: String(d.short), color: SHORT },
+                    { label: "Planned", value: d.target == null ? "–" : String(Math.round(d.target * 10) / 10), color: TARGET },
+                  ]}
+                />
+              );
+            }}
+          />
+          <Bar dataKey="long" stackId="a" fill={LONG} stroke="var(--card)" strokeWidth={2} />
+          <Bar dataKey="short" stackId="a" fill={SHORT} stroke="var(--card)" strokeWidth={2} radius={[4, 4, 0, 0]} />
+          <Line dataKey="target" type="stepAfter" stroke={TARGET} strokeDasharray="4 3" strokeWidth={2} dot={false} connectNulls />
+        </ComposedChart>
+      </ResponsiveContainer>
+    </div>
   );
 }

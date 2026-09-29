@@ -6,14 +6,20 @@ Internal dashboard for tracking everything Frame fellows publish, across platfor
 
 | Page | What's there |
 |---|---|
+| **Fellows** `/fellows` | Team only. The program database: one row per fellow with status (computed from their cadence plan, or set by hand), this week and program-to-date output vs plan, last post, last 1:1, open actions, next step, interests, goals, needs, point of contact, buddy, events, Slack activity and their personal sign-in link. Click any cell to edit. **Simple** shows the essentials; **All columns** or **Custom** shows the rest. |
+| **Board** `/cohort` | The Frame content board: every fellow's output since the fellowship started, plus a feed of the latest posts. Fellows see their own cohort here. |
+| **Resources** `/resources` | Team only. Events, people, funding and resources. Tags drive each fellow's recommendations. Luma events (weekly) and event links posted in Slack (daily) are added automatically. |
 | **Overview** `/` | Portfolio KPIs by cohort, weekly output chart with fellowship windows shaded, and a per-fellow table comparing before → during → after. Also cohort-level results from the anonymous exit survey. |
-| **Fellow** `/fellows/[slug]` | **Impact:** before/during/after scorecard, trajectory, followers, outcomes with counterfactual attribution, and the fellow's own counterfactual answers. **Content:** every post, with outlier multiplier, AI-safety score, topics, CTAs and orgs. **Messaging & CTAs:** topic, CTA and org mix before vs during, plus the claim-accuracy check. **Partner fit (Trudy):** Trudy reports per brand/org. **Audience response:** sentiment and signals (changed mind, learned, action intent, pushback, questions) across scraped comments, with the most-liked examples per signal and a per-post breakdown. **Forms:** curated intake, onboarding and exit answers. **Context & meetings** (team only): Granola meeting notes, decisions, action items and feedback on a timeline, plus follow-ups pulled from each meeting's next steps. |
+| **Fellow** `/fellows/[slug]` | **Impact:** before/during/after scorecard, trajectory, followers, outcomes with counterfactual attribution, and the fellow's own counterfactual answers. **Content:** every post, with outlier multiplier, AI-safety score, topics, CTAs and orgs. **Messaging & CTAs:** topic, CTA and org mix before vs during, plus the claim-accuracy check. **Partner fit (Trudy):** Trudy reports per brand/org. **Audience response:** sentiment and signals (changed mind, learned, action intent, pushback, questions) across scraped comments, with the most-liked examples per signal and a per-post breakdown. **Plan & cadence:** weekly targets (long/short form) vs published, per-week overrides, profile (about, interests, goals), accounts, and notes shared by the team. **Opportunities:** recommended events and resources with the reasons each was matched, plus what they went to or liked. **Forms:** curated intake, onboarding and exit answers. **Context & meetings** (team only): Granola meeting notes, decisions, action items and feedback on a timeline, plus follow-ups pulled from each meeting's next steps. |
 | **Content** `/content` | Search and filter every post across fellows, including transcripts. |
 | **Outliers** `/outliers` | Posts that beat or missed the creator's own normal (views ÷ median of their previous 20 posts), with the topics that are over-represented among them. |
 | **Methodology** `/methodology` | The seven metric layers, the counterfactual design, how each number is computed, and how this compares with what CreatorIQ, Modash, Trudy, Swayable and others track. Written for funders. |
 | **Data & scraping** `/data` | Team only. Tracked handles, Apify runs, dataset import, one-click scrape. |
 
-**Roles:** `TEAM_PASSWORD` gives full access and editing. `FUNDER_PASSWORD` is read-only, with private form answers and team notes hidden.
+**Roles:**
+- `TEAM_PASSWORD`: full access and editing.
+- `FUNDER_PASSWORD`: read-only; private form answers and team notes hidden.
+- **Fellows** sign in with a personal link (copy it from the Fellows page, *Fellow sign-in link* column). They see their own dashboard (Impact, Plan & cadence, Content, Audience, Opportunities) and can edit their profile, interests, goals, cadence plan and handles. Every change is logged. They can also see cohort-mates' content and the content board, but never team notes, Granola, Slack, forms, Trudy or other fellows' status. **Reset** invalidates a link.
 
 ## Data pipeline
 
@@ -80,6 +86,9 @@ The app deploys as-is to **Vercel** with a **Neon** Postgres database. It's the 
 
 - **Handles:** edit them on `/data`, or in `data/roster.ts` and re-seed.
 - **Weekly automation (`vercel.json`):** Monday 06:00 UTC `/api/cron/weekly-scrape` starts Apify runs for the last 21 days of posts on every tracked account, plus comments on posts from the last 30 days. Each run calls `/api/apify-webhook` when it finishes, which imports it. Monday 15:00 UTC `/api/cron/digest` posts a summary to Slack: output, outliers, audience signals, quiet fellows, open action items and failed runs. Needs these Vercel env vars: `APIFY_TOKEN`, `PUBLIC_URL`, `WEBHOOK_SECRET`, `CRON_SECRET`, `SLACK_WEBHOOK_URL`. Preview the digest with `/api/cron/digest?dry=1&token=$CRON_SECRET`.
+- **Slack (daily, `/api/cron/slack-sync`):** create a Slack app with bot scopes `channels:history`, `channels:read`, `groups:history`, `groups:read`, `users:read`, install it to the workspace, set `SLACK_BOT_TOKEN`, then `/invite` the bot to the channels to include. It never reads DMs. Fellows are linked by exact name match or by the Slack user ID on the Fellows page. Messages are tagged (concern, win, event, ask, feedback) and show on the team-only Context tab. Concerns also appear in the weekly digest. Tell fellows which channels are included.
+- **Events (weekly):** the Luma scraper searches AI-safety terms in SF and keeps only relevant events. Add trusted org calendars to `LUMA_CALENDARS` to include all of their events.
+- **Cadence:** targets start from the 1:1 notes (`npm run seed:program`, fills only empty fields). Edit them on the Fellows page or the Plan tab. For fellows tracked on a company channel (Taeyong / EO), set *Counts toward cadence* to AI-safety posts only.
 - **Fellow context:** add notes on the fellow's Context tab, or bulk-import them with `npm run import:context -- --granola notes.json --notion "Final Fellows….csv"` (keep these files out of git).
 - **Comments:** `npm run import:comments -- YOUTUBE <datasetId>` for a one-off dataset, and `-- --reanalyze` after editing `src/lib/analysis/comments.ts`.
 - **Re-tag after editing `src/lib/taxonomy.ts`:** `npm run analyze`.
@@ -89,6 +98,7 @@ The app deploys as-is to **Vercel** with a **Neon** Postgres database. It's the 
 
 - **Apify limit:** the free plan hit its monthly limit during the first backfill. Michaël's @TheInsideView and Mikey Posada's channel don't reach the baseline window yet, and the dashboard flags this as a "partial baseline".
 - **X:** limited to 10 tweets per run on the free plan, so Amina Green's X account isn't scraped yet.
-- **No handles yet:** Jessica Riches, Petr Salaba, Suzy Shepherd, Sara Polyweb, Stuart Harmon, Strad Slater, Jeremy Ornstein and Taeyong Kim.
+- **No handles yet:** Jessica Riches, Petr Salaba, Suzy Shepherd (cohort 1). Stuart Harmon has no channel of his own.
+- **Granola** has no server API we can call from Vercel. Notes come in through the Granola connector in a Claude session, or from pasted links on the Context tab.
 - **Comment tagging is keyword-based.** It's transparent but misses sarcasm, so treat rates as directional. An LLM pass is next.
 - **Phase 2:** web and press mentions; LinkedIn career moves; a comparison group of non-fellow applicants.

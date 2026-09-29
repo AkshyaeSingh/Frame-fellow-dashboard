@@ -21,6 +21,7 @@ export async function buildDigest(now = new Date()) {
     db.fellowNote.count({ where: { kind: "action", done: false } }),
     db.scrapeRun.findMany({ where: { createdAt: { gte: weekAgo } }, select: { platform: true, status: true } }),
   ]);
+  const slackConcerns = await db.slackMessage.findMany({ where: { postedAt: { gte: weekAgo }, signals: { has: "concern" } }, select: { fellow: { select: { name: true, slug: true } } } });
 
   const active = fellows.filter((f) => f.cohort.startDate <= now && f.cohort.endDate >= new Date(now.getTime() - 90 * DAY));
   const tracked = active.filter((f) => f._count.accounts > 0);
@@ -48,6 +49,9 @@ export async function buildDigest(now = new Date()) {
     quiet.length ? `*Quiet for 2+ weeks:* ${quiet.map((f) => link(`/fellows/${f.slug}`, f.name)).join(", ")}` : null,
     untracked.length ? `*No handles tracked yet:* ${untracked.map((f) => f.name).join(", ")}` : null,
     openActions ? `*Open action items:* ${openActions}` : null,
+    slackConcerns.length
+      ? `*Raised a concern in Slack:* ${[...new Map(slackConcerns.filter((m) => m.fellow).map((m) => [m.fellow!.slug, m.fellow!])).values()].map((f) => link(`/fellows/${f.slug}?tab=context`, f.name)).join(", ")}`
+      : null,
     failed.length ? `:warning: ${failed.length} scrape runs failed (${[...new Set(failed.map((r) => r.platform))].join(", ")}), so check ${link("/data", "Data")}` : null,
   ].filter(Boolean) as string[];
 

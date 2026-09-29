@@ -55,7 +55,7 @@ export async function syncRunsAction(): Promise<void> {
     const run = await getRun(token, r.runId);
     if (run.status === "SUCCEEDED") {
       const items = await fetchDataset(r.datasetId, token);
-      const rep = await importRun(db, r.platform, r.actor.includes("comments") ? "comments" : "posts", items);
+      const rep = await importRun(db, r.platform, r.actor.includes("(events)") ? "events" : r.actor.includes("comments") ? "comments" : "posts", items);
       await db.scrapeRun.update({ where: { id: r.id }, data: { status: "IMPORTED", items: items.length, postsUpserted: rep.posts } });
     } else if (run.status !== r.status) {
       await db.scrapeRun.update({ where: { id: r.id }, data: { status: run.status } });

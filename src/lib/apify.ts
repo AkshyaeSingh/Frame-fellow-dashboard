@@ -71,7 +71,7 @@ export const IG_PROFILE_INPUT = (a: Acct[]) => ({
 
 const API = "https://api.apify.com/v2";
 
-export async function startRun(token: string, actor: string, input: object, webhookUrl?: string, platform?: Platform, kind: "posts" | "comments" = "posts") {
+export async function startRun(token: string, actor: string, input: object, webhookUrl?: string, platform?: Platform, kind: "posts" | "comments" | "events" = "posts") {
   const qs = new URLSearchParams({ token });
   if (webhookUrl && platform) {
     const hooks = [{ eventTypes: ["ACTOR.RUN.SUCCEEDED"], requestUrl: webhookUrl, payloadTemplate: `{"platform":"${platform}","kind":"${kind}","resource":{{resource}}}` }];

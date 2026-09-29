@@ -1,9 +1,11 @@
-import { CheckCircle2, Circle, ExternalLink, Pin } from "lucide-react";
+import { CheckCircle2, Circle, ExternalLink, Eye, EyeOff, Pin } from "lucide-react";
 import { db } from "@/lib/db";
 import { shortDate } from "@/lib/format";
 import { cn } from "@/lib/utils";
 import { Chip, Empty, SectionTitle } from "@/components/bits";
 import { addNoteAction, deleteNoteAction, toggleNoteAction } from "../../team-actions";
+import { toggleNoteSharedAction } from "../../program-actions";
+import { SlackPanel } from "./slack-panel";
 
 // Team-only: everything we know about a fellow outside their public content —
 // interview and check-in notes (Granola), decisions, action items, feedback.
@@ -20,15 +22,17 @@ const KIND_LABEL = Object.fromEntries(KINDS.map((k) => [k.key, k.label])) as Rec
 // Pull "Next Steps" lines out of Granola notes so open follow-ups are visible without opening each meeting.
 function nextSteps(body: string | null) {
   if (!body) return [];
-  const i = body.search(/\nNext Steps\n/i);
+  const lines = body.split("\n");
+  const i = lines.findIndex((l) => /^#*\s*next steps\s*$/i.test(l.trim()));
   if (i < 0) return [];
-  return body
-    .slice(i)
-    .split("\n")
-    .slice(2)
-    .map((l) => l.trim())
-    .filter((l) => l && /\(|^(send|follow|confirm|review|finalize|share|complete|william|stuart|aaron|lauren)/i.test(l))
-    .slice(0, 6);
+  const out: string[] = [];
+  for (const l of lines.slice(i + 1)) {
+    if (/^#{1,3} /.test(l)) break;
+    const t = l.trim();
+    if (t.startsWith("- ")) out.push(t.slice(2).replace(/\*\*/g, ""));
+    else if (!body.includes("\n# ") && t && /\(|^(send|follow|confirm|review|finalize|share|complete|schedule|book|reach|connect|ask|get|start|draft|decide)/i.test(t)) out.push(t);
+  }
+  return out.slice(0, 6);
 }
 
 export async function ContextTab({ fellowId }: { fellowId: string }) {
@@ -36,7 +40,12 @@ export async function ContextTab({ fellowId }: { fellowId: string }) {
   const pinned = notes.filter((n) => n.pinned);
   const open = notes.filter((n) => n.kind === "action" && !n.done);
   const timeline = notes.filter((n) => !n.pinned);
-  const followUps = notes.filter((n) => n.kind === "meeting").flatMap((n) => nextSteps(n.body).map((s) => ({ s, n })));
+  // Next steps from the two most recent meetings.
+  const followUps = notes
+    .filter((n) => n.kind === "meeting")
+    .sort((a, b) => (b.date?.getTime() ?? 0) - (a.date?.getTime() ?? 0))
+    .slice(0, 2)
+    .flatMap((n) => nextSteps(n.body).map((s) => ({ s, n })));
 
   return (
     <div className="grid gap-6 lg:grid-cols-[1fr_20rem]">
@@ -45,7 +54,7 @@ export async function ContextTab({ fellowId }: { fellowId: string }) {
           <NoteCard key={n.id} n={n} />
         ))}
         <section>
-          <SectionTitle hint="Meetings, decisions, action items and feedback, newest first. Team only; funders never see this tab.">Timeline</SectionTitle>
+          <SectionTitle hint="Meetings, decisions, action items and feedback, newest first. Team only unless you mark a note Shared, which puts it on the fellow's Plan tab.">Timeline</SectionTitle>
           <div className="space-y-3">
             {timeline.map((n) => (
               <NoteCard key={n.id} n={n} />
@@ -85,6 +94,7 @@ export async function ContextTab({ fellowId }: { fellowId: string }) {
             </ul>
           </section>
         )}
+        <SlackPanel fellowId={fellowId} />
         <NoteForm fellowId={fellowId} />
       </aside>
     </div>
@@ -92,6 +102,16 @@ export async function ContextTab({ fellowId }: { fellowId: string }) {
 }
 
 type Note = Awaited<ReturnType<typeof db.fellowNote.findMany>>[number];
+
+// One-line plain-text preview of a note body (markdown markers stripped).
+const preview = (body: string) =>
+  body
+    .split("\n")
+    .map((l) => l.replace(/^#+ |^\s*- |^\d+\. |\*\*/g, "").trim())
+    .filter(Boolean)
+    .join(" · ")
+    .slice(0, 260)
+    .trimEnd();
 
 function NoteCard({ n }: { n: Note }) {
   const long = (n.body?.length ?? 0) > 600;
@@ -108,6 +128,11 @@ function NoteCard({ n }: { n: Note }) {
               Open <ExternalLink className="size-3" />
             </a>
           )}
+          <form action={toggleNoteSharedAction.bind(null, n.id)}>
+            <button title={n.shared ? "Visible on the fellow's dashboard. Click to make team-only" : "Team-only. Click to share with the fellow"} className={cn("inline-flex items-center gap-1 hover:text-foreground", n.shared && "text-foreground")}>
+              {n.shared ? <Eye className="size-3.5" /> : <EyeOff className="size-3.5" />} {n.shared ? "Shared" : "Team only"}
+            </button>
+          </form>
           <form action={toggleNoteAction.bind(null, n.id, "pinned")}>
             <button title={n.pinned ? "Unpin" : "Pin to top"} className={cn("hover:text-foreground", n.pinned && "text-foreground")}>
               <Pin className="size-3.5" />
@@ -131,7 +156,7 @@ function NoteCard({ n }: { n: Note }) {
           (long ? (
             <details className="mt-1 text-sm">
               <summary className="cursor-pointer text-muted-foreground">
-                <span className="whitespace-pre-wrap">{n.body.slice(0, 280).trimEnd()}…</span> <span className="text-xs underline">Show all</span>
+                <span>{preview(n.body)}…</span> <span className="text-xs underline">Show all</span>
               </summary>
               <Body text={n.body} />
             </details>
@@ -143,20 +168,31 @@ function NoteCard({ n }: { n: Note }) {
   );
 }
 
-// Granola exports are heading/line based: lines without punctuation that precede a block read as headings.
+// Renders Granola summaries: markdown headings/bullets (Sep 2026 on) or the
+// older line-per-point share-page text.
 function Body({ text }: { text: string }) {
-  const lines = text.split("\n");
+  const lines = text.split("\n").filter((l) => l.trim());
+  const md = lines.some((l) => /^(#{1,3} |\s*- |\d+\. )/.test(l));
+  const bold = (l: string) =>
+    l.split(/(\*\*[^*]+\*\*)/).map((part, i) => (part.startsWith("**") ? <strong key={i}>{part.slice(2, -2)}</strong> : part.replace(/\\([~&])/g, "$1")));
   return (
     <div className="mt-1 space-y-0.5 text-sm">
       {lines.map((l, i) => {
-        const heading = l.length < 70 && !/[.,:;)?]$/.test(l) && i + 1 < lines.length && /^[A-Z]/.test(l) && !lines[i + 1]!.startsWith(l) && (i === 0 || l.split(" ").length <= 7);
-        return heading ? (
-          <p key={i} className="pt-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground first:pt-0">
-            {l}
-          </p>
-        ) : (
-          <p key={i} className="pl-3 before:mr-1.5 before:-ml-3 before:text-muted-foreground before:content-['•']">
-            {l}
+        const heading = md ? /^#{1,3} /.test(l) : l.length < 70 && !/[.,:;)?]$/.test(l) && i + 1 < lines.length && /^[A-Z]/.test(l) && l.split(" ").length <= 7;
+        if (heading)
+          return (
+            <p key={i} className="pt-2 text-xs font-semibold tracking-wide text-muted-foreground uppercase first:pt-0">
+              {l.replace(/^#+ /, "")}
+            </p>
+          );
+        const sub = /^\s{2,}- /.test(l);
+        const numbered = l.match(/^(\d+)\. (.*)/);
+        const content = l.replace(/^\s*- /, "").replace(/^\d+\. /, "");
+        if (md && !/^\s*- |^\d+\. /.test(l)) return <p key={i} className="pl-3 text-muted-foreground">{bold(content)}</p>;
+        return (
+          <p key={i} className={cn("pl-3 before:mr-1.5 before:-ml-3 before:text-muted-foreground", sub ? "ml-4 before:content-['◦']" : numbered ? "" : "before:content-['•']")}>
+            {numbered && <span className="mr-1 -ml-3 text-muted-foreground">{numbered[1]}.</span>}
+            {bold(content)}
           </p>
         );
       })}

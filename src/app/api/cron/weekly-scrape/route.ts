@@ -1,9 +1,9 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { cronAuthorized } from "@/lib/cron";
-import { startCommentScrape, startPostScrape, webhookUrl } from "@/lib/scrape";
+import { startCommentScrape, startEventScrape, startPostScrape, webhookUrl } from "@/lib/scrape";
 
 // Weekly (see vercel.json): scrape the last 21 days of posts for every tracked
-// account, plus comments on recent posts. Apify calls /api/apify-webhook when
+// account, plus comments on recent posts and upcoming Luma events. Apify calls /api/apify-webhook when
 // each run finishes, which imports it.
 export const maxDuration = 60;
 
@@ -15,5 +15,6 @@ export async function GET(req: NextRequest) {
   const since = new Date(Date.now() - 21 * 86_400_000).toISOString().slice(0, 10);
   const posts = await startPostScrape(token, since, 30);
   const comments = await startCommentScrape(token);
-  return NextResponse.json({ ok: true, started: [...posts, ...comments] });
+  const events = await startEventScrape(token);
+  return NextResponse.json({ ok: true, started: [...posts, ...comments, ...events] });
 }

@@ -11,7 +11,7 @@ export default async function LoginPage(props: PageProps<"/login">) {
     <div className="flex flex-1 items-center justify-center px-4">
       <div className="w-full max-w-sm rounded-xl border bg-card p-6">
         <p className="text-sm font-semibold">Frame · Fellow Impact</p>
-        <p className="mt-1 mb-5 text-xs text-muted-foreground">Internal. Team and funders only.</p>
+        <p className="mt-1 mb-5 text-xs text-muted-foreground">Internal. Team and funders sign in with a password; fellows use their personal link.</p>
         <LoginForm next={next} />
         {process.env.NODE_ENV === "development" && (
           <form action={devLoginAction} className="mt-3 flex gap-2">
@@ -20,6 +20,9 @@ export default async function LoginPage(props: PageProps<"/login">) {
             </button>
             <button name="role" value="funder" className="h-8 flex-1 rounded-md border text-xs hover:bg-muted">
               Dev: funder view
+            </button>
+            <button name="role" value="fellow:reuben-adams" className="h-8 flex-1 rounded-md border text-xs hover:bg-muted">
+              Dev: fellow
             </button>
           </form>
         )}

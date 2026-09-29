@@ -3,6 +3,7 @@ import type { Platform } from "@prisma/client";
 import { db } from "@/lib/db";
 import { ACTORS, COMMENT_ACTORS, IG_PROFILE_INPUT, startRun } from "@/lib/apify";
 import { PLATFORM_LABEL } from "@/lib/taxonomy";
+import { LUMA_ACTOR, lumaInput } from "@/lib/ingest/events";
 
 // Shared by the "Start scrape" button and the weekly cron. Runs report back
 // to /api/apify-webhook, which imports them — no polling needed.
@@ -51,4 +52,11 @@ export async function startCommentScrape(token: string, { days = 30, maxPosts = 
     started.push(`${PLATFORM_LABEL[platform]} comments (${posts.length} posts)`);
   }
   return started;
+}
+
+// Upcoming AI-safety events from Luma, filtered and tagged on import.
+export async function startEventScrape(token: string) {
+  const run = await startRun(token, LUMA_ACTOR, lumaInput(), webhookUrl(), "OTHER", "events");
+  await db.scrapeRun.create({ data: { runId: run.id, datasetId: run.defaultDatasetId, platform: "OTHER", actor: `${LUMA_ACTOR} (events)`, status: run.status } });
+  return ["Luma events"];
 }

@@ -52,3 +52,8 @@ export function initials(name: string) {
     .map((p) => p[0]!.toUpperCase())
     .join("");
 }
+
+// Point in time n days ago (kept out of components so renders stay pure).
+export function daysAgo(n: number) {
+  return new Date(Date.now() - n * 86_400_000);
+}

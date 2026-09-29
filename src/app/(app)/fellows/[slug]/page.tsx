@@ -2,8 +2,10 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { ArrowLeft, ExternalLink } from "lucide-react";
-import { requireRole } from "@/lib/auth";
+import { getSession } from "@/lib/auth";
+import { redirect } from "next/navigation";
 import { getFellow } from "@/lib/data";
+import { db } from "@/lib/db";
 import { compact, relativeDate, shortDate } from "@/lib/format";
 import { compareWindows, type PostLike } from "@/lib/metrics";
 import { PLATFORM_LABEL } from "@/lib/taxonomy";
@@ -17,6 +19,8 @@ import { TrudyTab } from "./trudy-tab";
 import { FormsTab } from "./forms-tab";
 import { AudienceTab } from "./audience-tab";
 import { ContextTab } from "./context-tab";
+import { PlanTab } from "./plan-tab";
+import { OpportunitiesTab } from "./opportunities-tab";
 
 export async function generateMetadata(props: PageProps<"/fellows/[slug]">): Promise<Metadata> {
   const { slug } = await props.params;
@@ -24,32 +28,48 @@ export async function generateMetadata(props: PageProps<"/fellows/[slug]">): Pro
   return { title: f?.name ?? "Fellow" };
 }
 
+// who: team sees everything; funders skip team-only tabs; a fellow sees their
+// own dashboard ("self") or just the content of a cohort-mate ("peer").
 const TABS = [
-  { key: "overview", label: "Impact" },
-  { key: "content", label: "Content" },
-  { key: "messaging", label: "Messaging & CTAs" },
-  { key: "audience", label: "Audience response" },
-  { key: "trudy", label: "Partner fit (Trudy)" },
-  { key: "forms", label: "Forms & self-reports" },
-  { key: "context", label: "Context & meetings", teamOnly: true },
+  { key: "overview", label: "Impact", who: ["team", "funder", "self"] },
+  { key: "plan", label: "Plan & cadence", who: ["team", "self"] },
+  { key: "content", label: "Content", who: ["team", "funder", "self", "peer"] },
+  { key: "messaging", label: "Messaging & CTAs", who: ["team", "funder"] },
+  { key: "audience", label: "Audience response", who: ["team", "funder", "self"] },
+  { key: "opportunities", label: "Opportunities", who: ["team", "self"] },
+  { key: "trudy", label: "Partner fit (Trudy)", who: ["team", "funder"] },
+  { key: "forms", label: "Forms & self-reports", who: ["team", "funder"] },
+  { key: "context", label: "Context & meetings", who: ["team"] },
 ] as const;
 
 export default async function FellowPage(props: PageProps<"/fellows/[slug]">) {
-  const role = await requireRole();
+  const session = await getSession();
+  if (!session) redirect("/login");
   const { slug } = await props.params;
   const sp = await props.searchParams;
   const f = await getFellow(slug);
   if (!f) notFound();
-  const isTeam = role === "team";
-  const tabs = TABS.filter((t) => isTeam || !("teamOnly" in t));
-  const tab = tabs.find((t) => t.key === sp.tab)?.key ?? "overview";
+  const isTeam = session.role === "team";
+  const isSelf = session.role === "fellow" && session.fellowId === f.id;
+  const viewer: "team" | "funder" | "self" | "peer" = session.role === "fellow" ? (isSelf ? "self" : "peer") : session.role;
+  if (viewer === "peer") {
+    // Fellows can look at the content of fellows in their own cohort only.
+    const me = await db.fellow.findUnique({ where: { id: session.fellowId }, select: { cohortId: true } });
+    if (me?.cohortId !== f.cohortId) redirect("/me");
+  }
+  const tabs = TABS.filter((t) => (t.who as readonly string[]).includes(viewer));
+  const tab = tabs.find((t) => t.key === sp.tab)?.key ?? tabs[0]!.key;
   const cmp = compareWindows(f.posts as PostLike[], f.cohort.startDate, f.cohort.endDate);
 
   return (
     <div className="space-y-6">
-      <Link href="/" className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground">
-        <ArrowLeft className="size-4" /> Portfolio
-      </Link>
+      {viewer === "self" ? (
+        <p className="text-sm text-muted-foreground">Your dashboard. Anything wrong? Fix it on the Plan tab, or tell the Frame team.</p>
+      ) : (
+        <Link href={viewer === "peer" ? "/cohort" : isTeam ? "/fellows" : "/"} className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground">
+          <ArrowLeft className="size-4" /> {viewer === "peer" ? "Cohort" : isTeam ? "Fellows" : "Portfolio"}
+        </Link>
+      )}
 
       <header className="flex flex-wrap items-start justify-between gap-6">
         <div className="flex items-start gap-4">
@@ -84,7 +104,7 @@ export default async function FellowPage(props: PageProps<"/fellows/[slug]">) {
               </a>
             );
           })}
-          {!f.accounts.length && <span className="text-xs text-muted-foreground">No handles yet{isTeam && " — add them on the Data page"}</span>}
+          {!f.accounts.length && <span className="text-xs text-muted-foreground">No handles yet{isTeam ? ", add them on the Data page" : isSelf ? ". Tell the Frame team where you post" : ""}</span>}
         </div>
       </header>
 
@@ -92,7 +112,7 @@ export default async function FellowPage(props: PageProps<"/fellows/[slug]">) {
         {tabs.map((t) => (
           <Link
             key={t.key}
-            href={t.key === "overview" ? `/fellows/${f.slug}` : `/fellows/${f.slug}?tab=${t.key}`}
+            href={t.key === tabs[0]!.key ? `/fellows/${f.slug}` : `/fellows/${f.slug}?tab=${t.key}`}
             className={cn("-mb-px shrink-0 border-b-2 px-3 py-2 text-sm", tab === t.key ? "border-foreground font-medium" : "border-transparent text-muted-foreground hover:text-foreground")}
           >
             {t.label}
@@ -107,6 +127,8 @@ export default async function FellowPage(props: PageProps<"/fellows/[slug]">) {
       {tab === "trudy" && <TrudyTab f={f} isTeam={isTeam} />}
       {tab === "forms" && <FormsTab f={f} isTeam={isTeam} />}
       {tab === "audience" && <AudienceTab fellowId={f.id} />}
+      {tab === "plan" && <PlanTab f={f} isTeam={isTeam} isSelf={isSelf} />}
+      {tab === "opportunities" && <OpportunitiesTab fellowId={f.id} isTeam={isTeam} canEdit={isTeam || isSelf} />}
       {tab === "context" && isTeam && <ContextTab fellowId={f.id} />}
     </div>
   );

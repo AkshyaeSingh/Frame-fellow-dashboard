@@ -1,9 +1,11 @@
 import type { Platform, PrismaClient } from "@prisma/client";
 import { normalizeComments, storeComments } from "./comments";
 import { ingestItems } from "./store";
+import { ingestLumaEvents } from "./events";
 
-// Imports a finished Apify run: posts (plus Instagram's inline latestComments) or a comments dataset.
-export async function importRun(db: PrismaClient, platform: Platform, kind: "posts" | "comments", items: unknown[]) {
+// Imports a finished Apify run: posts (plus Instagram's inline latestComments), a comments dataset, or Luma events.
+export async function importRun(db: PrismaClient, platform: Platform, kind: "posts" | "comments" | "events", items: unknown[]) {
+  if (kind === "events") return ingestLumaEvents(db, items);
   if (kind === "comments") {
     const r = await storeComments(db, platform, normalizeComments(platform, items as Record<string, unknown>[]));
     return { posts: 0, comments: r.stored };

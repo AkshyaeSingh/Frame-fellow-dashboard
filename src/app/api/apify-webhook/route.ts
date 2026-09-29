@@ -22,7 +22,7 @@ export async function POST(req: NextRequest) {
   if (!res.defaultDatasetId) return new NextResponse("missing defaultDatasetId", { status: 400 });
 
   const items = await fetchDataset(res.defaultDatasetId, process.env.APIFY_TOKEN || undefined);
-  const kind = body.kind === "comments" ? "comments" : "posts";
+  const kind = body.kind === "comments" || body.kind === "events" ? body.kind : "posts";
   const r = await importRun(db, platform, kind, items);
   await db.scrapeRun.upsert({
     where: { runId: res.id ?? res.defaultDatasetId },

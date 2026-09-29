@@ -14,7 +14,9 @@
     "analyze:llm": "tsx scripts/analyze-llm.ts",
     "db:migrate": "prisma migrate deploy",
     "import:comments": "tsx scripts/import-comments.ts",
-    "import:context": "tsx scripts/import-context.ts"
+    "import:context": "tsx scripts/import-context.ts",
+    "import:run": "tsx scripts/import-run.ts",
+    "seed:program": "tsx scripts/seed-program.ts"
   },
   "prisma": {
     "seed": "tsx prisma/seed.ts"

@@ -39,6 +39,26 @@ model Fellow {
   // Snapshot of the fellow's stated goals at intake
   goals       String?
 
+  // ---- Program management (team edits; fellows can edit the "shared" ones) ----
+  about          String? // shared: who they are / what they're making, in their words
+  interests      String[] // shared: topics, formats, communities (drives recommendations)
+  programGoals   String? // shared: goals for this fellowship
+  fellowNotes    String? // shared: anything else the fellow wants us to know
+  needs          String? // team: what they need from us
+  nextStep       String? // team
+  health         String? // team: on-track | behind | needs-help | paused
+  pointOfContact String? // team
+  buddy          String? // accountability partner
+  slackUserId    String? @unique
+  // Cadence plan: weekly targets by format, plus program totals
+  longPerWeek    Float?
+  shortPerWeek   Float?
+  programLong    Int?
+  programShort   Int?
+  cadenceNote    String?
+  cadenceScope   String   @default("all") // all | ai-safety: which posts count toward cadence
+  accessVersion  Int      @default(1) // bump to revoke a fellow's sign-in link
+
   accounts  Account[]
   posts     Post[]
   outcomes  Outcome[]
@@ -46,6 +66,10 @@ model Fellow {
   commentsReceived Comment[]
   responses FormResponse[]
   trudy     TrudyReport[]
+  cadenceWeeks CadenceWeek[]
+  resources FellowResource[]
+  slack     SlackMessage[]
+  edits     FellowEdit[]
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 }
@@ -187,7 +211,8 @@ model FellowNote {
   source    String   @default("manual") // manual | granola | notion | slack
   author    String?
   pinned    Boolean  @default(false)
-  done      Boolean  @default(false) // for action items
+  done      Boolean  @default(false)
+  shared    Boolean  @default(false) // visible to the fellow on their own dashboard // for action items
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -277,4 +302,95 @@ model CohortSurvey {
   submittedAt DateTime?
   answers     Json
   createdAt   DateTime @default(now())
+}
+
+// Per-week cadence overrides (week 1 = first week of the fellowship).
+model CadenceWeek {
+  id       String @id @default(cuid())
+  fellowId String
+  fellow   Fellow @relation(fields: [fellowId], references: [id], onDelete: Cascade)
+  week     Int
+  long     Int?
+  short    Int?
+  note     String?
+
+  @@unique([fellowId, week])
+}
+
+// Events, resources, opportunities and people we point fellows to.
+model Resource {
+  id          String    @id @default(cuid())
+  kind        String // event | resource | funding | person | opportunity
+  title       String
+  url         String?
+  date        DateTime?
+  endDate     DateTime?
+  location    String?
+  description String?
+  tags        String[]
+  source      String    @default("manual") // manual | granola | slack | luma
+  externalId  String?   @unique
+  createdBy   String?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  fellows FellowResource[]
+}
+
+// A fellow's relationship to a resource: recommended, interested, attended, liked…
+model FellowResource {
+  id         String   @id @default(cuid())
+  fellowId   String
+  fellow     Fellow   @relation(fields: [fellowId], references: [id], onDelete: Cascade)
+  resourceId String
+  resource   Resource @relation(fields: [resourceId], references: [id], onDelete: Cascade)
+  status     String // recommended | interested | attended | liked | not-relevant
+  note       String?
+  by         String   @default("team") // team | fellow | auto
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@unique([fellowId, resourceId])
+}
+
+// Messages fellows post in channels the Frame Slack bot has been added to.
+model SlackMessage {
+  id         String   @id @default(cuid())
+  channelId  String
+  channel    String?
+  ts         String
+  threadTs   String?
+  userId     String
+  fellowId   String?
+  fellow     Fellow?  @relation(fields: [fellowId], references: [id], onDelete: SetNull)
+  text       String
+  permalink  String?
+  replies    Int      @default(0)
+  reactions  Int      @default(0)
+  signals    String[]
+  postedAt   DateTime
+  createdAt  DateTime @default(now())
+
+  @@unique([channelId, ts])
+  @@index([fellowId, postedAt])
+}
+
+// Audit trail for profile edits (team or the fellow themself).
+model FellowEdit {
+  id        String   @id @default(cuid())
+  fellowId  String
+  fellow    Fellow   @relation(fields: [fellowId], references: [id], onDelete: Cascade)
+  field     String
+  before    String?
+  after     String?
+  by        String // "team" | "fellow"
+  createdAt DateTime @default(now())
+
+  @@index([fellowId, createdAt])
+}
+
+model SyncState {
+  key       String   @id
+  value     String
+  updatedAt DateTime @updatedAt
 }

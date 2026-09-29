@@ -1,5 +1,5 @@
 // Imports team context onto fellow pages (Context tab):
-//   1. Meeting notes exported from Granola (JSON: [{fellow, date, title, url, body}])
+//   1. Meeting notes exported from Granola (JSON: [{fellow, date, title, url, body, kind?, done?}])
 //   2. Team notes from the Notion "Final Fellows" export (support level, what they need, planned output…)
 //
 //   npm run import:context -- --granola <notes.json> --notion "<Final Fellows …_all.csv>"
@@ -24,7 +24,7 @@ async function fellowId(nameOrSlug: string) {
   return (await db.fellow.findUnique({ where: { slug: seed.slug }, select: { id: true } }))?.id ?? null;
 }
 
-async function upsertNote(data: { fellowId: string; kind: string; title: string; body?: string | null; url?: string | null; date?: Date | null; source: string; pinned?: boolean }) {
+async function upsertNote(data: { fellowId: string; kind: string; title: string; body?: string | null; url?: string | null; date?: Date | null; source: string; pinned?: boolean; done?: boolean }) {
   const existing = await db.fellowNote.findFirst({
     where: data.url ? { fellowId: data.fellowId, url: data.url } : { fellowId: data.fellowId, source: data.source, title: data.title },
   });
@@ -35,7 +35,7 @@ async function upsertNote(data: { fellowId: string; kind: string; title: string;
 async function main() {
   const g = arg("granola");
   if (g) {
-    const notes = JSON.parse(readFileSync(g, "utf8")) as { fellow: string; date: string; title: string; url: string; body: string }[];
+    const notes = JSON.parse(readFileSync(g, "utf8")) as { fellow: string; date: string; title: string; url: string; body: string | null; kind?: string; done?: boolean }[];
     let n = 0;
     for (const note of notes) {
       const id = await fellowId(note.fellow);
@@ -43,7 +43,7 @@ async function main() {
         console.warn(`  no fellow for ${note.fellow}`);
         continue;
       }
-      await upsertNote({ fellowId: id, kind: "meeting", title: note.title, body: note.body, url: note.url, date: new Date(note.date), source: "granola" });
+      await upsertNote({ fellowId: id, kind: note.kind ?? "meeting", title: note.title, body: note.body, url: note.url, date: new Date(note.date), source: "granola", done: note.done });
       n++;
     }
     console.log(`Granola: ${n} meeting notes`);
@@ -59,7 +59,10 @@ async function main() {
         console.warn(`  no fellow for ${r["Name"]}`);
         continue;
       }
-      const clean = (s?: string) => (s ?? "").replace(/https:\/\/notes\.granola\.ai\/\S+/g, "").replace(/\s+\n/g, "\n").trim();
+      const clean = (s?: string) => {
+        const t = (s ?? "").replace(/https:\/\/notes\.granola\.ai\/\S+/g, "").replace(/\s+\n/g, "\n").trim();
+        return /[a-z0-9]/i.test(t) ? t : "";
+      };
       const lines = [
         r["Track"] && `Track: ${r["Track"]} · ${r["Type"] ?? ""}`,
         r["With whom"] && `Partner org: ${r["With whom"]}`,

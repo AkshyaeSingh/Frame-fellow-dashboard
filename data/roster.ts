@@ -73,22 +73,26 @@ export const ROSTER: FellowSeed[] = [
   { name: "Lauren Mushro", slug: "lauren-mushro", cohort: "cohort-2", track: "Amplifier", format: "Short form", partnerOrg: "Apart Research",
     accounts: [ig("anatomyofai", { primary: true })] },
   { name: "Amina Green", slug: "amina-green", cohort: "cohort-2", track: "Amplifier", format: "Short form", partnerOrg: "MATS",
-    accounts: [x("Amina_io", { primary: true })] },
-  { name: "Sara Polyweb", slug: "sara-polyweb", cohort: "cohort-2", track: "Amplifier", format: "Short form", partnerOrg: "TBD (maybe CAIS)", accounts: [] },
-  { name: "Stuart Harmon", slug: "stuart-harmon", cohort: "cohort-2", track: "Amplifier", format: "Long form", partnerOrg: "The Midas Project (pending)", plannedOutput: "1 video on AI education", accounts: [] },
+    accounts: [x("Amina_io", { primary: true })] }, // also MATS Amplifier
+  { name: "Sara Polyweb", slug: "sara-polyweb", cohort: "cohort-2", track: "Amplifier", format: "Short form", partnerOrg: "CASE",
+    accounts: [ig("sarainwondertech", { primary: true }), ss("sarainwondertech")] },
+  { name: "Stuart Harmon", slug: "stuart-harmon", cohort: "cohort-2", track: "Amplifier", format: "Long form", partnerOrg: "The Midas Project (pending)", plannedOutput: "1 video on AI education", accounts: [] }, // no channel of his own
   { name: "Martin Lee", slug: "martin-lee", cohort: "cohort-2", track: "Independent", format: "Long form", formNames: ["Martin Lee (Seungmin Lee)"], plannedOutput: "10 Humans vs AI series: trailers, episodes, 30 short clips",
     accounts: [ig("mwtle", { primary: true }), ig("10humansvsai", { note: "10 Humans vs AI series" }), yt("mrwtle"), li("mrtle")] },
   { name: "Aaron Nev McLachlan", slug: "aaron-nev", cohort: "cohort-2", track: "Independent", format: "Long form", formNames: ["Aaron Nev McLachlan", "Aaron Nev"], plannedOutput: "4–6 long-form videos",
-    accounts: [yt("nevscape", { primary: true }), tt("struthiverse")] },
+    accounts: [yt("nevscape", { primary: true })] }, // @struthiverse is the old studio page, not tracked
   { name: "Reuben Adams", slug: "reuben-adams", cohort: "cohort-2", track: "Independent", format: "Long form", plannedOutput: "6 long episodes",
     accounts: [yt("ReubenJAdams", { primary: true })] },
   { name: "Jeroen Willems", slug: "jeroen-willems", cohort: "cohort-2", track: "Independent", format: "Short form", plannedOutput: "3 long-form, 20 short-form",
     accounts: [yt("ahappierworldyt", { primary: true }), ig("ahappierworldyt"), tt("ahappierworldyt")] },
   { name: "William Lee", slug: "william-lee", cohort: "cohort-2", track: "Independent", format: "Long form", plannedOutput: "6 investigatory long videos",
-    accounts: [yt("un.william", { primary: true, note: "Korean-language channel" })] },
-  { name: "Strad Slater", slug: "strad-slater", cohort: "cohort-2", track: "Independent", format: "Long form", plannedOutput: "20 explanatory videos", accounts: [] },
-  { name: "Jeremy Ornstein", slug: "jeremy-ornstein", cohort: "cohort-2", track: "Independent", format: "Short form", plannedOutput: "80 short interviews (The Human Intelligence Show)", accounts: [] },
-  { name: "Taeyong Kim", slug: "taeyong-kim", cohort: "cohort-2", track: "Independent", format: "Long form", plannedOutput: "8 interviews with AI safety people", accounts: [] },
+    accounts: [yt("un.william", { primary: true, note: "Korean-language channel (confirmed his)" })] },
+  { name: "Strad Slater", slug: "strad-slater", cohort: "cohort-2", track: "Independent", format: "Long form", plannedOutput: "20 explanatory videos",
+    accounts: [yt("stradslater", { primary: true })] },
+  { name: "Jeremy Ornstein", slug: "jeremy-ornstein", cohort: "cohort-2", track: "Independent", format: "Short form", plannedOutput: "80 short interviews (The Human Intelligence Show)",
+    accounts: [ig("humanintelligenceshow", { primary: true, note: "Human Intelligence Show" }), ig("jer1300", { note: "Personal" })] },
+  { name: "Taeyong Kim", slug: "taeyong-kim", cohort: "cohort-2", track: "Independent", format: "Long form", plannedOutput: "8 interviews with AI safety people",
+    accounts: [yt("eoglobal", { primary: true, note: "EO, his company channel (most videos are not fellowship output)" })] },
 ];
 
 // Finished Apify runs to import (npm run import:apify). New runs are appended
