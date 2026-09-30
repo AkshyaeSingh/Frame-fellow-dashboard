@@ -16,10 +16,10 @@ Internal dashboard for tracking everything Frame fellows publish, across platfor
 | **Methodology** `/methodology` | The seven metric layers, the counterfactual design, how each number is computed, and how this compares with what CreatorIQ, Modash, Trudy, Swayable and others track. Written for funders. |
 | **Data & scraping** `/data` | Team only. Tracked handles, Apify runs, dataset import, one-click scrape. |
 
-**Roles:**
-- `TEAM_PASSWORD`: full access and editing.
-- `FUNDER_PASSWORD`: read-only; private form answers and team notes hidden.
-- **Fellows** sign in with a personal link (copy it from the Fellows page, *Fellow sign-in link* column). They see their own dashboard (Impact, Plan & cadence, Content, Audience, Opportunities) and can edit their profile, interests, goals, cadence plan and handles. Every change is logged. They can also see cohort-mates' content and the content board, but never team notes, Granola, Slack, forms, Trudy or other fellows' status. **Reset** invalidates a link.
+**Sign-in:** one form, username + password.
+- `admin` + `TEAM_PASSWORD`: full access and editing.
+- `funder` + `FUNDER_PASSWORD`: read-only; private form answers and team notes hidden.
+- **Fellows:** their lowercase first name, plus a password the team creates on the Fellows page (*Fellow sign-in* column → Create/Reset password). Only a hash is stored. Fellows can change it on their Plan & cadence tab. They see their own dashboard (Impact, Plan & cadence, Content, Audience, Opportunities) and can edit their profile, interests, goals, cadence plan and handles; every change is logged. They can also see cohort-mates' content and the content board, but never team notes, Granola, Slack, forms, Trudy or other fellows' status. A personal sign-in link is also available, and *Sign out all* invalidates sessions and links.
 
 ## Data pipeline
 

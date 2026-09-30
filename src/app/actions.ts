@@ -3,20 +3,33 @@
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { db } from "@/lib/db";
+import { verifyPassword } from "@/lib/password";
 import { COOKIE, MAX_AGE, roleForPassword, signRole, signSession } from "@/lib/session";
 
+const COOKIE_OPTS = { httpOnly: true, sameSite: "lax", secure: process.env.NODE_ENV === "production", path: "/", maxAge: MAX_AGE } as const;
+
+// One sign-in form for everyone:
+//   admin  + TEAM_PASSWORD    → team
+//   funder + FUNDER_PASSWORD  → read-only funder view
+//   <first name> + their own password → that fellow
 export async function loginAction(_: string | undefined, formData: FormData) {
-  const role = roleForPassword(String(formData.get("password") ?? ""));
-  if (!role) return "Incorrect password";
-  (await cookies()).set(COOKIE, signRole(role), {
-    httpOnly: true,
-    sameSite: "lax",
-    secure: process.env.NODE_ENV === "production",
-    path: "/",
-    maxAge: MAX_AGE,
-  });
-  const next = String(formData.get("next") ?? "/");
-  redirect(next.startsWith("/") && !next.startsWith("//") ? next : "/");
+  const password = String(formData.get("password") ?? "");
+  const username = String(formData.get("username") ?? "").trim().toLowerCase();
+  const fail = async (msg = "Incorrect username or password") => {
+    await new Promise((r) => setTimeout(r, 600));
+    return msg;
+  };
+  if (username === "admin" || username === "funder") {
+    const role = roleForPassword(password);
+    if (!role || (username === "admin") !== (role === "team")) return fail();
+    (await cookies()).set(COOKIE, signRole(role), COOKIE_OPTS);
+    const next = String(formData.get("next") ?? "/");
+    redirect(next.startsWith("/") && !next.startsWith("//") ? next : "/");
+  }
+  const f = await db.fellow.findUnique({ where: { username }, select: { id: true, accessVersion: true, passwordHash: true } });
+  if (!f || !(await verifyPassword(password, f.passwordHash))) return fail();
+  (await cookies()).set(COOKIE, signSession({ role: "fellow", fellowId: f.id, version: f.accessVersion }), COOKIE_OPTS);
+  redirect("/me");
 }
 
 export async function logoutAction() {

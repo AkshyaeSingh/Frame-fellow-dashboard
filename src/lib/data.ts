@@ -56,6 +56,7 @@ export async function getPortfolio() {
 export async function getFellow(slug: string) {
   return db.fellow.findUnique({
     where: { slug },
+    omit: { passwordHash: true },
     include: {
       cohort: true,
       accounts: { include: { snapshots: { orderBy: { takenAt: "asc" } } }, orderBy: [{ isPrimary: "desc" }, { platform: "asc" }] },

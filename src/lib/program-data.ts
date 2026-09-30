@@ -20,6 +20,7 @@ export async function programRows(cohortSlug: string) {
   const fellows = await db.fellow.findMany({
     where: { cohort: { slug: cohortSlug } },
     orderBy: { name: "asc" },
+    omit: { passwordHash: true },
     include: {
       cohort: true,
       cadenceWeeks: { select: { week: true, long: true, short: true, note: true } },
@@ -30,6 +31,7 @@ export async function programRows(cohortSlug: string) {
       _count: { select: { slack: { where: { postedAt: { gte: new Date(now.getTime() - 30 * DAY) } } } } },
     },
   });
+  const withPassword = new Set((await db.fellow.findMany({ where: { cohort: { slug: cohortSlug }, passwordHash: { not: null } }, select: { id: true } })).map((x) => x.id));
   return fellows.map((f) => {
     const c = cadence(planOf(f), f.posts, f.cohort.startDate, f.cohort.endDate, now);
     const meetings = f.context.filter((n) => n.kind === "meeting" && n.date).sort((a, b) => b.date!.getTime() - a.date!.getTime());
@@ -43,6 +45,7 @@ export async function programRows(cohortSlug: string) {
       interested: f.resources.filter((r) => r.status === "interested").length,
       slack30d: f._count.slack,
       invite: `/join/${inviteToken(f.id, f.accessVersion)}`,
+      hasPassword: withPassword.has(f.id),
     };
   });
 }

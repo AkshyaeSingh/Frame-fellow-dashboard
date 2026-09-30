@@ -57,7 +57,9 @@ model Fellow {
   programShort   Int?
   cadenceNote    String?
   cadenceScope   String   @default("all") // all | ai-safety: which posts count toward cadence
-  accessVersion  Int      @default(1) // bump to revoke a fellow's sign-in link
+  accessVersion  Int      @default(1) // bump to revoke a fellow's sign-in link and sessions
+  username       String?  @unique // fellow sign-in (lowercase first name)
+  passwordHash   String? // scrypt; set by the team or the fellow
 
   accounts  Account[]
   posts     Post[]

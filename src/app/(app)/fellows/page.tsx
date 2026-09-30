@@ -12,7 +12,9 @@ import { CreatorAvatar } from "@/components/creator-avatar";
 import { CopyLink } from "@/components/copy-link";
 import { HEALTH_STYLE } from "@/components/health-badge";
 import { cn } from "@/lib/utils";
-import { rotateAccessAction } from "../program-actions";
+import { Editable } from "@/components/editable";
+import { PasswordReveal } from "@/components/password-reveal";
+import { generatePasswordAction, rotateAccessAction, setUsernameAction } from "../program-actions";
 
 export const metadata: Metadata = { title: "Fellows" };
 
@@ -33,7 +35,7 @@ const COLUMNS = [
   { key: "buddy", label: "Buddy" },
   { key: "events", label: "Events" },
   { key: "slack", label: "Slack" },
-  { key: "access", label: "Fellow sign-in link" },
+  { key: "access", label: "Fellow sign-in" },
 ];
 
 
@@ -213,13 +215,23 @@ function Row({ r }: { r: ProgramRow }) {
         <FellowField fellowId={f.id} field="slackUserId" value={f.slackUserId} />
         {f.slackUserId && <span className="text-muted-foreground">{r.slack30d} msgs / 30d</span>}
       </td>
-      <td data-col="access" className="px-3 py-2 text-xs whitespace-nowrap">
-        <CopyLink path={r.invite} />
-        <form action={rotateAccessAction.bind(null, f.id)} className="inline">
-          <button className="ml-2 text-muted-foreground hover:text-bad" title="Invalidate the current link and any sessions from it">
-            Reset
-          </button>
-        </form>
+      <td data-col="access" className="min-w-44 px-3 py-2 text-xs text-muted-foreground">
+        <div className="flex items-center gap-1">
+          <span>User</span>
+          <Editable value={f.username} type="text" placeholder="set username" save={setUsernameAction.bind(null, f.id)} className="font-mono text-xs" />
+        </div>
+        <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1">
+          {r.hasPassword ? <span className="text-good">Password set</span> : <span>No password</span>}
+          <PasswordReveal hasPassword={r.hasPassword} generate={generatePasswordAction.bind(null, f.id)} />
+        </div>
+        <div className="mt-1 flex items-center gap-2">
+          <CopyLink path={r.invite} label="Copy sign-in link" />
+          <form action={rotateAccessAction.bind(null, f.id)} className="inline">
+            <button className="hover:text-bad" title="Sign the fellow out everywhere and invalidate their link">
+              Sign out all
+            </button>
+          </form>
+        </div>
       </td>
     </tr>
   );

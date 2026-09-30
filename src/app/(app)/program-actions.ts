@@ -6,6 +6,7 @@ import { requireSelfOrTeam, requireTeam, getSession } from "@/lib/auth";
 import type { Platform } from "@prisma/client";
 import { FIELD_DEFS as FIELDS, type FieldKey } from "@/lib/fellow-fields";
 import { PLATFORM_LABEL } from "@/lib/taxonomy";
+import { generatePassword, hashPassword, MIN_PASSWORD, verifyPassword } from "@/lib/password";
 
 async function refresh(fellowId?: string) {
   revalidatePath("/fellows");
@@ -173,4 +174,46 @@ export async function removeOwnAccountAction(fellowId: string, accountId: string
   await db.account.delete({ where: { id: a.id } });
   await db.fellowEdit.create({ data: { fellowId, field: "accounts", after: `removed ${PLATFORM_LABEL[a.platform]} ${a.handle}`, by } });
   await refresh(fellowId);
+}
+
+// ---------- Fellow passwords ----------
+
+// Team: generate a new password for a fellow. Returned once so it can be
+// shared; only the hash is stored. Signs the fellow out everywhere.
+export async function generatePasswordAction(fellowId: string) {
+  await requireTeam();
+  const password = generatePassword();
+  const f = await db.fellow.findUniqueOrThrow({ where: { id: fellowId }, select: { name: true, username: true } });
+  const username = f.username ?? f.name.split(" ")[0]!.toLowerCase();
+  await db.fellow.update({ where: { id: fellowId }, data: { username, passwordHash: await hashPassword(password), accessVersion: { increment: 1 } } });
+  await db.fellowEdit.create({ data: { fellowId, field: "password", after: "reset by team", by: "team" } });
+  await refresh(fellowId);
+  return { username, password };
+}
+
+export async function setUsernameAction(fellowId: string, raw: string) {
+  await requireTeam();
+  const username = raw.trim().toLowerCase().replace(/[^a-z0-9._-]/g, "") || null;
+  if (username) {
+    const taken = await db.fellow.findFirst({ where: { username, NOT: { id: fellowId } }, select: { name: true } });
+    if (taken) throw new Error(`Username taken by ${taken.name}`);
+  }
+  await db.fellow.update({ where: { id: fellowId }, data: { username } });
+  await refresh(fellowId);
+}
+
+// Fellow: change their own password (needs the current one).
+export async function changeOwnPasswordAction(_: string | undefined, formData: FormData) {
+  const s = await getSession();
+  if (s?.role !== "fellow") return "Only fellows can change their password here.";
+  const current = String(formData.get("current") ?? "");
+  const next = String(formData.get("next") ?? "");
+  if (next.length < MIN_PASSWORD) return `Use at least ${MIN_PASSWORD} characters.`;
+  if (next !== String(formData.get("confirm") ?? "")) return "The new passwords don't match.";
+  const f = await db.fellow.findUniqueOrThrow({ where: { id: s.fellowId }, select: { passwordHash: true, accessVersion: true } });
+  if (!(await verifyPassword(current, f.passwordHash))) return "Current password is incorrect.";
+  // Keep this session valid (don't bump accessVersion); other devices stay signed in until they expire.
+  await db.fellow.update({ where: { id: s.fellowId }, data: { passwordHash: await hashPassword(next) } });
+  await db.fellowEdit.create({ data: { fellowId: s.fellowId!, field: "password", after: "changed by fellow", by: "fellow" } });
+  return "saved";
 }

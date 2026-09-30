@@ -9,6 +9,7 @@ import { HealthBadge } from "@/components/health-badge";
 import { CadenceChart } from "@/components/charts";
 import { Editable } from "@/components/editable";
 import { SectionTitle } from "@/components/bits";
+import { ChangePassword } from "@/components/change-password";
 import { cn } from "@/lib/utils";
 import { PLATFORM_LABEL } from "@/lib/taxonomy";
 import { PlatformIcon } from "@/components/platform-icon";
@@ -155,6 +156,13 @@ export async function PlanTab({ f, isTeam, isSelf }: { f: FellowFull; isTeam: bo
               <input name="handle" required placeholder="@handle or link" className="h-8 min-w-0 flex-1 rounded-md border bg-background px-2 text-sm" />
               <button className="h-8 rounded-md border px-2 text-xs">Add</button>
             </form>
+          </section>
+        )}
+
+        {isSelf && (
+          <section className="rounded-lg border bg-card p-3">
+            <SectionTitle hint={`You sign in as “${f.username}”.`}>Password</SectionTitle>
+            <ChangePassword />
           </section>
         )}
 
