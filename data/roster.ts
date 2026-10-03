@@ -69,7 +69,7 @@ export const ROSTER: FellowSeed[] = [
   { name: "Ernestine Siu", slug: "ernestine-siu", cohort: "cohort-2", track: "Amplifier", format: "Short form", partnerOrg: "Andon Labs", plannedOutput: "Own content with accountability",
     accounts: [ig("heyernestine", { primary: true }), yt("ErnestineSiu")] },
   { name: "Reaa Puri", slug: "reaa-puri", cohort: "cohort-2", track: "Amplifier", format: "Short form", partnerOrg: "Humans in Control",
-    accounts: [ig("reaapuri", { primary: true }), tt("arcsofconnection")] },
+    accounts: [ig("reaapuri", { primary: true }), tt("reaapuri"), tt("arcsofconnection", { note: "Test account" })] },
   { name: "Lauren Mushro", slug: "lauren-mushro", cohort: "cohort-2", track: "Amplifier", format: "Short form", partnerOrg: "Apart Research",
     accounts: [ig("anatomyofai", { primary: true })] },
   { name: "Amina Green", slug: "amina-green", cohort: "cohort-2", track: "Amplifier", format: "Short form", partnerOrg: "MATS",
@@ -90,7 +90,7 @@ export const ROSTER: FellowSeed[] = [
   { name: "Strad Slater", slug: "strad-slater", cohort: "cohort-2", track: "Independent", format: "Long form", plannedOutput: "20 explanatory videos",
     accounts: [yt("stradslater", { primary: true })] },
   { name: "Jeremy Ornstein", slug: "jeremy-ornstein", cohort: "cohort-2", track: "Independent", format: "Short form", plannedOutput: "80 short interviews (The Human Intelligence Show)",
-    accounts: [ig("humanintelligenceshow", { primary: true, note: "Human Intelligence Show" }), ig("jer1300", { note: "Personal" })] },
+    accounts: [ig("humanintelligenceshow", { primary: true, note: "Human Intelligence Show" }), tt("jeremy_o123"), ig("jer1300", { note: "Personal" })] },
   { name: "Taeyong Kim", slug: "taeyong-kim", cohort: "cohort-2", track: "Independent", format: "Long form", plannedOutput: "8 interviews with AI safety people",
     accounts: [yt("eoglobal", { primary: true, note: "EO, his company channel (most videos are not fellowship output)" })] },
 ];
