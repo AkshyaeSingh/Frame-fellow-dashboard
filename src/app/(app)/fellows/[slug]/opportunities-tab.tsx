@@ -41,7 +41,7 @@ export async function OpportunitiesTab({ fellowId, isTeam, canEdit }: { fellowId
               </ResourceCard>
             ))}
           </div>
-          {!recs.length && <Empty>No matches yet. Add interests on the Plan tab to get recommendations.</Empty>}
+          {!recs.length && <Empty>No matches yet. Add interests to their profile to get recommendations.</Empty>}
         </section>
         <section>
           <SectionTitle>Events & resources {isTeam ? "they've" : "you've"} marked</SectionTitle>

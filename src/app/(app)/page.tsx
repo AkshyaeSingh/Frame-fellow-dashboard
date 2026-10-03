@@ -1,219 +1,156 @@
+import type { Metadata } from "next";
 import Link from "next/link";
+import { redirect } from "next/navigation";
+import { getRole } from "@/lib/auth";
 import { db } from "@/lib/db";
-import { getPortfolio, postLikeSelect } from "@/lib/data";
-import { compact, pct } from "@/lib/format";
-import { lift, weekly, type PostLike } from "@/lib/metrics";
-import { PLATFORM_LABEL } from "@/lib/taxonomy";
+import { compact, daysAgo, relativeDate } from "@/lib/format";
+import { programRows, type ProgramRow } from "@/lib/program-data";
+import { fmtTarget } from "@/lib/program";
+import { ColumnToggle } from "@/components/column-toggle";
 import { CreatorAvatar } from "@/components/creator-avatar";
-import { PlatformIcon } from "@/components/platform-icon";
-import { WeeklyViewsChart } from "@/components/charts";
-import { Delta, Empty, PointDelta, SectionTitle, StatTile } from "@/components/bits";
+import { HealthBadge } from "@/components/health-badge";
+import { SectionTitle, StatTile } from "@/components/bits";
 import { cn } from "@/lib/utils";
+import { COLUMNS, FellowsTable } from "./fellows-table";
 
-const one = (v: string | string[] | undefined) => (Array.isArray(v) ? v[0] : v);
+export const metadata: Metadata = { title: "Home" };
 
-export default async function OverviewPage(props: PageProps<"/">) {
+// Team home: who needs attention this week, the cohort at a glance, and the
+// editable fellows table. Funders land on the impact report instead.
+
+type Flag = { label: string; tone: "bad" | "warn" };
+
+function flagsFor(r: ProgramRow, concerns: number, oldestOpenAction: Date | null, now: number): Flag[] {
+  const out: Flag[] = [];
+  const health = r.f.health ?? r.cadence.health;
+  const DAY = 86_400_000;
+  if (health === "needs-help") out.push({ label: "Marked needs help", tone: "bad" });
+  if (health === "off-track") out.push({ label: `Off track (${Math.round((r.cadence.pace ?? 0) * 100)}% of plan)`, tone: "bad" });
+  if (health === "no-plan") out.push({ label: "No cadence plan", tone: "warn" });
+  if (!r.f.accounts.length) out.push({ label: "No accounts tracked", tone: "warn" });
+  else if (!r.lastPost || now - r.lastPost.getTime() > 14 * DAY) out.push({ label: `Quiet: last post ${relativeDate(r.lastPost)}`, tone: "warn" });
+  if (concerns) out.push({ label: `Raised a concern in Slack`, tone: "bad" });
+  if (!r.lastMeeting || now - r.lastMeeting.getTime() > 21 * DAY) out.push({ label: `No 1:1 in ${r.lastMeeting ? relativeDate(r.lastMeeting).replace(" ago", "") : "the program"}`, tone: "warn" });
+  if (oldestOpenAction && now - oldestOpenAction.getTime() > 7 * DAY) out.push({ label: `${r.openActions} open action${r.openActions > 1 ? "s" : ""}, oldest ${relativeDate(oldestOpenAction)}`, tone: "warn" });
+  return out;
+}
+
+export default async function HomePage(props: PageProps<"/">) {
+  const role = await getRole();
+  if (role !== "team") redirect(role === "fellow" ? "/me" : "/impact");
   const sp = await props.searchParams;
-  const cohorts = await db.cohort.findMany({ orderBy: { startDate: "asc" } });
-  const sel = one(sp.cohort) ?? "all";
-  // Tracked fellows first (by followers), untracked after.
-  const rows = (await getPortfolio())
-    .filter((r) => sel === "all" || r.fellow.cohort.slug === sel)
-    .sort((a, b) => Number(b.totalPosts > 0) - Number(a.totalPosts > 0) || b.followers - a.followers);
-  const tracked = rows.filter((r) => r.totalPosts > 0);
+  const cohorts = await db.cohort.findMany({ orderBy: { startDate: "desc" } });
+  const cohort = cohorts.find((c) => c.slug === sp.cohort) ?? cohorts[0]!;
+  const weekAgo = daysAgo(7);
+  const [rows, concerns, openActions, signals] = await Promise.all([
+    programRows(cohort.slug),
+    db.slackMessage.groupBy({ by: ["fellowId"], where: { postedAt: { gte: weekAgo }, signals: { has: "concern" }, fellow: { cohortId: cohort.id } }, _count: true }),
+    db.fellowNote.groupBy({ by: ["fellowId"], where: { kind: "action", done: false, fellow: { cohortId: cohort.id } }, _min: { createdAt: true } }),
+    db.comment.findMany({
+      where: { isCreator: false, fellow: { cohortId: cohort.id }, post: { publishedAt: { gte: cohort.startDate } } },
+      select: { signals: true },
+    }),
+  ]);
+  const now = daysAgo(0).getTime();
+  const concernBy = new Map(concerns.map((c) => [c.fellowId, c._count]));
+  const actionBy = new Map(openActions.map((a) => [a.fellowId, a._min.createdAt]));
+  const flagged = rows
+    .map((r) => ({ r, flags: flagsFor(r, concernBy.get(r.f.id) ?? 0, actionBy.get(r.f.id) ?? null, now) }))
+    .filter((x) => x.flags.length && x.r.f.health !== "paused");
+  // Urgent = at least one red flag; the rest get a one-line mention.
+  const attention = flagged
+    .filter((x) => x.flags.some((f) => f.tone === "bad"))
+    .sort((a, b) => b.flags.filter((f) => f.tone === "bad").length - a.flags.filter((f) => f.tone === "bad").length || (a.r.cadence.pace ?? 1) - (b.r.cadence.pace ?? 1));
+  const watch = flagged.filter((x) => !x.flags.some((f) => f.tone === "bad"));
 
-  // Pooled totals
-  const sumW = (k: "baseline" | "during", f: (s: NonNullable<(typeof rows)[number]["cmp"]["during"]>) => number) =>
-    tracked.reduce((s, r) => s + f(r.cmp[k]), 0);
-  const duringPosts = sumW("during", (s) => s.posts);
-  const duringAis = sumW("during", (s) => s.aiSafetyPosts);
-  const basePosts = sumW("baseline", (s) => s.posts);
-  const baseAis = sumW("baseline", (s) => s.aiSafetyPosts);
-  const duringAisViews = sumW("during", (s) => s.aiSafetyViews);
-  const baseAisViews = sumW("baseline", (s) => s.aiSafetyViews);
-  const duringVm = sumW("during", (s) => s.viewerMinutes);
-  const outcomes = rows.reduce((s, r) => s + r.fellow._count.outcomes, 0);
-  const cadenceLifts = tracked
-    .map((r) => lift(r.cmp.during.postsPerWeek, r.cmp.baseline.postsPerWeek))
-    .filter((x): x is number => x != null && Number.isFinite(x))
-    .sort((a, b) => a - b);
-  const medianCadenceLift = cadenceLifts.length ? cadenceLifts[Math.floor(cadenceLifts.length / 2)]! : null;
-
-  // Weekly chart across selected fellows
-  const posts = (await db.post.findMany({
-    where: { fellow: sel === "all" ? {} : { cohort: { slug: sel } } },
-    select: postLikeSelect,
-  })) as PostLike[];
-  const from = new Date(Math.min(...(sel === "all" ? cohorts : cohorts.filter((c) => c.slug === sel)).map((c) => c.startDate.getTime() - 120 * 86_400_000)));
-  const weeks = weekly(posts, from, new Date());
-  const windows = (sel === "all" ? cohorts : cohorts.filter((c) => c.slug === sel)).map((c) => ({ from: c.startDate.getTime(), to: c.endDate.getTime(), label: c.name }));
-
-  const anon = sel !== "cohort-2" ? await db.cohortSurvey.findMany({ where: { cohortSlug: "cohort-1" } }) : [];
-  const anonQ = (re: RegExp) =>
-    anon.map((r) => (r.answers as { q: string; a: string }[]).find((x) => re.test(x.q))?.a).filter((x): x is string => !!x);
-  const grantAnswers = anonQ(/more valuable than just receiving a grant/i);
-  const ratings = anonQ(/^Overall, how would you rate/i).map(Number).filter((n) => !isNaN(n));
-  const recommend = anonQ(/Would you recommend/i).map(Number).filter((n) => !isNaN(n));
+  // Cohort at a glance (posts counted the same way as cadence: company channels only count AI-safety posts).
+  const inProgram = rows.flatMap((r) => r.f.posts.filter((p) => p.publishedAt && p.publishedAt >= cohort.startDate && (r.f.cadenceScope !== "ai-safety" || p.isAiSafety)));
+  const aiViews = inProgram.filter((p) => p.isAiSafety).reduce((s, p) => s + (p.views ?? 0), 0);
+  const weekActual = rows.reduce((s, r) => s + (r.cadence.thisWeek ? r.cadence.thisWeek.long.actual + r.cadence.thisWeek.short.actual : 0), 0);
+  const weekPlan = rows.reduce((s, r) => s + (r.cadence.thisWeek ? (r.cadence.thisWeek.long.target ?? 0) + (r.cadence.thisWeek.short.target ?? 0) : 0), 0);
+  const withPlan = rows.filter((r) => !["no-plan", "not-started"].includes(r.cadence.health));
+  const onTrack = withPlan.filter((r) => ["on-track", "done"].includes(r.f.health ?? r.cadence.health)).length;
+  const moved = signals.filter((c) => c.signals.some((s) => s === "changed-mind" || s === "learned" || s === "action")).length;
+  const c0 = rows[0]?.cadence;
 
   return (
     <div className="space-y-8">
-      <div className="flex flex-wrap items-end justify-between gap-4">
+      <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
-          <h1 className="text-xl font-semibold tracking-tight">Fellow portfolio</h1>
-          <p className="mt-1 max-w-2xl text-sm text-muted-foreground">
-            What every fellow published before, during and after Frame — scraped across platforms, tagged for AI safety
-            relevance, topics and calls to action. Compare windows to see what changed.
+          <h1 className="text-xl font-semibold tracking-tight">{cohort.name.split(" (")[0]}</h1>
+          <p className="mt-1 text-sm text-muted-foreground">
+            {c0 && c0.currentWeek >= 1 && c0.currentWeek <= c0.totalWeeks ? `Week ${c0.currentWeek} of ${c0.totalWeeks}` : c0 && c0.currentWeek > c0.totalWeeks ? "Fellowship finished" : "Not started"} ·{" "}
+            {rows.length} fellows
           </p>
         </div>
-        <div className="flex gap-1 text-sm">
-          {[{ slug: "all", name: "All cohorts" }, ...cohorts.map((c) => ({ slug: c.slug, name: c.name.split(" (")[0]! }))].map((c) => (
-            <Link
-              key={c.slug}
-              href={c.slug === "all" ? "/" : `/?cohort=${c.slug}`}
-              className={cn("rounded-md border px-3 py-1", sel === c.slug ? "border-foreground bg-foreground text-background" : "text-muted-foreground hover:text-foreground")}
-            >
-              {c.name}
+        <div className="flex rounded-md border p-0.5 text-xs">
+          {cohorts.map((c) => (
+            <Link key={c.id} href={c.id === cohorts[0]!.id ? "/" : `/?cohort=${c.slug}`} className={cn("rounded px-2 py-1", c.id === cohort.id ? "bg-muted font-medium" : "text-muted-foreground")}>
+              {c.name.split(" (")[0]}
             </Link>
           ))}
         </div>
       </div>
 
-      <section className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-6">
-        <StatTile label="Fellows with tracked content" value={`${tracked.length}/${rows.length}`} sub={`${compact(tracked.reduce((s, r) => s + r.totalPosts, 0))} posts tracked`} />
-        <StatTile
-          label="AI safety share of output"
-          value={duringPosts ? pct(duringAis / duringPosts, 0) : "—"}
-          sub={
-            <>
-              during vs {basePosts ? pct(baseAis / basePosts, 0) : "—"} before · <PointDelta from={basePosts ? baseAis / basePosts : null} to={duringPosts ? duringAis / duringPosts : null} />
-            </>
-          }
-          hint="Share of posts tagged AI safety, pooled across fellows"
-        />
-        <StatTile label="AI safety views during" value={compact(duringAisViews)} sub={<>vs {compact(baseAisViews)} in the 90 days before · <Delta value={lift(duringAisViews, baseAisViews)} /></>} />
-        <StatTile label="Median cadence change" value={<Delta value={medianCadenceLift} className="text-2xl" />} sub="posts/week, during vs before (per fellow)" />
-        <StatTile label="Est. AI safety viewer-minutes" value={compact(duringVm)} sub="during fellowship · see methodology" hint="views × typical watch share × length × AI-safety relevance" />
-        <StatTile label="Outcomes logged" value={outcomes} sub="press, collabs, grants, jobs…" />
-      </section>
-
-      <section className="rounded-lg border bg-card p-4">
-        <SectionTitle hint="Weekly views of posts published that week (views keep accruing, so recent weeks are still maturing).">Output over time</SectionTitle>
-        <WeeklyViewsChart data={weeks} windows={windows} />
+      <section className="grid grid-cols-2 gap-3 md:grid-cols-5">
+        <StatTile label="On track" value={`${onTrack} / ${withPlan.length}`} sub="fellows with a cadence plan" />
+        <StatTile label="This week" value={`${weekActual} / ${fmtTarget(Math.round(weekPlan * 10) / 10)}`} sub="posts vs planned" />
+        <StatTile label="Posts this fellowship" value={inProgram.length} sub={`${inProgram.filter((p) => p.isAiSafety).length} on AI safety`} />
+        <StatTile label="AI-safety views" value={compact(aiViews)} sub="on posts since the start" />
+        <StatTile label="Audience moved" value={compact(moved)} sub="comments: changed mind, learned, or acting" />
       </section>
 
       <section>
-        <SectionTitle hint="Baseline = 90 days before the fellowship. Click a fellow for the full profile.">Fellows</SectionTitle>
-        <div className="overflow-x-auto rounded-lg border bg-card">
-          <table className="w-full min-w-[1100px] text-sm">
-            <thead className="border-b text-left text-xs text-muted-foreground">
-              <tr>
-                <th className="px-3 py-2 font-medium">Fellow</th>
-                <th className="px-3 py-2 font-medium">Track</th>
-                <th className="px-3 py-2 font-medium">Platforms</th>
-                <th className="px-3 py-2 text-right font-medium">Followers</th>
-                <th className="px-3 py-2 text-right font-medium" title="Posts per week: before → during">Cadence</th>
-                <th className="px-3 py-2 text-right font-medium" title="Share of posts about AI safety: before → during → after">AI safety share</th>
-                <th className="px-3 py-2 text-right font-medium" title="Median views of AI safety posts during the fellowship vs before">Median AIS views</th>
-                <th className="px-3 py-2 text-right font-medium" title="Posts asking for real-world action (petition, lawmaker, course…) during">Action CTAs</th>
-                <th className="px-3 py-2 text-right font-medium">Outcomes</th>
-              </tr>
-            </thead>
-            <tbody>
-              {rows.map(({ fellow: f, cmp, followers, totalPosts, truncated }) => (
-                <tr key={f.id} className="border-b last:border-0 hover:bg-muted/50">
-                  <td className="px-3 py-2">
-                    <Link href={`/fellows/${f.slug}`} className="flex items-center gap-2.5">
-                      <CreatorAvatar name={f.name} src={f.accounts.find((a) => a.avatarUrl)?.avatarUrl} className="size-7 text-[10px]" />
-                      <span>
-                        <span className="font-medium hover:underline">{f.name}</span>
-                        <span className="block text-xs text-muted-foreground">
-                          {f.cohort.name.split(" (")[0]}
-                          {truncated && (
-                            <span className="ml-1.5 rounded bg-s4/25 px-1 text-foreground" title="Scraped history doesn't reach the baseline window for at least one account — before/after comparisons are incomplete.">
-                              ⚠ partial baseline
-                            </span>
-                          )}
-                        </span>
-                      </span>
-                    </Link>
-                  </td>
-                  <td className="px-3 py-2 text-xs">
-                    {f.track ?? "—"}
-                    {f.partnerOrg && <span className="block text-muted-foreground">↔ {f.partnerOrg}</span>}
-                  </td>
-                  <td className="px-3 py-2">
-                    <span className="flex gap-1.5 text-foreground/70">
-                      {f.accounts.map((a) => (
-                        <span key={a.id} title={`${PLATFORM_LABEL[a.platform]} ${a.handle}`}>
-                          <PlatformIcon platform={a.platform} />
-                        </span>
-                      ))}
-                      {!f.accounts.length && <span className="text-xs text-muted-foreground">no handles yet</span>}
-                    </span>
-                  </td>
-                  <td className="px-3 py-2 text-right tabular-nums">{followers ? compact(followers) : "—"}</td>
-                  {totalPosts ? (
-                    <>
-                      <td className="px-3 py-2 text-right text-xs tabular-nums">
-                        {cmp.baseline.postsPerWeek.toFixed(1)} → {cmp.during.postsPerWeek.toFixed(1)}
-                        <span className="block">
-                          <Delta value={lift(cmp.during.postsPerWeek, cmp.baseline.postsPerWeek)} />
-                        </span>
-                      </td>
-                      <td className="px-3 py-2 text-right text-xs tabular-nums">
-                        {pct(cmp.baseline.aiSafetyShare, 0)} → {pct(cmp.during.aiSafetyShare, 0)}
-                        {cmp.after && <> → {pct(cmp.after.aiSafetyShare, 0)}</>}
-                        <span className="block">
-                          <PointDelta from={cmp.baseline.aiSafetyShare} to={cmp.during.aiSafetyShare} />
-                        </span>
-                      </td>
-                      <td className="px-3 py-2 text-right text-xs tabular-nums">
-                        {compact(cmp.baseline.medianAiSafetyViews)} → {compact(cmp.during.medianAiSafetyViews)}
-                        <span className="block">
-                          <Delta value={lift(cmp.during.medianAiSafetyViews, cmp.baseline.medianAiSafetyViews)} />
-                        </span>
-                      </td>
-                      <td className="px-3 py-2 text-right tabular-nums">{cmp.during.actionCtaPosts}</td>
-                    </>
-                  ) : (
-                    <td colSpan={4} className="px-3 py-2 text-right text-xs text-muted-foreground">
-                      {f.accounts.length ? "No posts scraped yet" : "Add handles to start tracking"}
-                    </td>
-                  )}
-                  <td className="px-3 py-2 text-right tabular-nums">{f._count.outcomes || "—"}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      </section>
-
-      {anon.length > 0 && (
-        <section>
-          <SectionTitle hint={`Anonymous exit survey, cohort 1 (n=${anon.length}). Never linked to individual fellows.`}>Fellows&apos; own counterfactual view</SectionTitle>
-          <div className="grid gap-3 md:grid-cols-3">
-            <StatTile label="Overall rating" value={ratings.length ? `${(ratings.reduce((a, b) => a + b, 0) / ratings.length).toFixed(1)}/10` : "—"} />
-            <StatTile label="Would recommend to a creator they respect" value={recommend.length ? `${(recommend.reduce((a, b) => a + b, 0) / recommend.length).toFixed(1)}/10` : "—"} />
-            <div className="rounded-lg border bg-card p-4">
-              <p className="text-xs text-muted-foreground">More valuable than just receiving a grant?</p>
-              {grantAnswers.length ? (
-                <ul className="mt-2 space-y-1 text-sm">
-                  {Object.entries(grantAnswers.reduce<Record<string, number>>((m, a) => ((m[a] = (m[a] ?? 0) + 1), m), {}))
-                    .sort((a, b) => b[1] - a[1])
-                    .map(([a, n]) => (
-                      <li key={a} className="flex justify-between gap-3">
-                        <span>{a}</span>
-                        <span className="tabular-nums text-muted-foreground">{n}</span>
+        <SectionTitle hint="Off track on their cadence plan, marked needs help, or raised a concern in Slack this week. Other flags: quiet 2+ weeks, no 1:1 in 3+ weeks, actions open over a week.">
+          Needs attention · {attention.length}
+        </SectionTitle>
+        {attention.length ? (
+          <div className="grid gap-2 md:grid-cols-2 xl:grid-cols-3">
+            {attention.map(({ r, flags }) => (
+              <Link key={r.f.id} href={`/fellows/${r.f.slug}`} className="flex gap-3 rounded-lg border bg-card p-3 hover:border-foreground/30">
+                <CreatorAvatar name={r.f.name} src={r.f.accounts.find((a) => a.avatarUrl)?.avatarUrl} className="size-8 text-xs" />
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-center justify-between gap-2">
+                    <p className="truncate text-sm font-medium">{r.f.name}</p>
+                    <HealthBadge health={r.f.health ?? r.cadence.health} />
+                  </div>
+                  <ul className="mt-1 space-y-0.5 text-xs">
+                    {flags.map((f) => (
+                      <li key={f.label} className={f.tone === "bad" ? "text-bad" : "text-muted-foreground"}>
+                        {f.label}
                       </li>
                     ))}
-                </ul>
-              ) : (
-                <Empty>No responses</Empty>
-              )}
-            </div>
+                  </ul>
+                  {r.f.nextStep && <p className="mt-1 line-clamp-1 text-xs">Next: {r.f.nextStep}</p>}
+                </div>
+              </Link>
+            ))}
           </div>
-        </section>
-      )}
+        ) : (
+          <p className="rounded-lg border border-dashed px-4 py-6 text-center text-sm text-muted-foreground">Nobody is off track or flagging a concern.</p>
+        )}
+        {watch.length > 0 && (
+          <p className="mt-3 text-xs text-muted-foreground">
+            <span className="font-medium text-foreground">Also worth a look: </span>
+            {watch.map((x, i) => (
+              <span key={x.r.f.id}>
+                {i > 0 && " · "}
+                <Link href={`/fellows/${x.r.f.slug}`} className="text-foreground hover:underline">
+                  {x.r.f.name.split(" ")[0]}
+                </Link>{" "}
+                ({x.flags.map((f) => f.label.replace(/^Quiet: last post /, "quiet, last post ").toLowerCase()).join(", ")})
+              </span>
+            ))}
+          </p>
+        )}
+      </section>
+
+      <section>
+        <SectionTitle hint="Click any cell to edit. Changes save instantly and are logged." right={<ColumnToggle id="fellows" columns={COLUMNS} />}>
+          All fellows
+        </SectionTitle>
+        <FellowsTable rows={rows} />
+      </section>
     </div>
   );
 }

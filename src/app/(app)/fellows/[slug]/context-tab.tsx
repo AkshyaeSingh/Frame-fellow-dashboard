@@ -54,7 +54,7 @@ export async function ContextTab({ fellowId }: { fellowId: string }) {
           <NoteCard key={n.id} n={n} />
         ))}
         <section>
-          <SectionTitle hint="Meetings, decisions, action items and feedback, newest first. Team only unless you mark a note Shared, which puts it on the fellow's Plan tab.">Timeline</SectionTitle>
+          <SectionTitle hint="Meetings, decisions, action items and feedback, newest first. Team only unless you mark a note Shared, which shows it on the fellow's My week page.">Timeline</SectionTitle>
           <div className="space-y-3">
             {timeline.map((n) => (
               <NoteCard key={n.id} n={n} />

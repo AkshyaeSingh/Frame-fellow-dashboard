@@ -125,7 +125,7 @@ export async function deleteResourceAction(id: string) {
 
 // ---------- Access ----------
 
-// Invalidates the fellow's current sign-in link and sessions; a new link is shown on the Fellows page.
+// Invalidates the fellow's current sign-in link and sessions; a new link is shown in the fellows table on Home.
 export async function rotateAccessAction(fellowId: string) {
   await requireTeam();
   await db.fellow.update({ where: { id: fellowId }, data: { accessVersion: { increment: 1 } } });

@@ -9,7 +9,7 @@ export function PasswordReveal({ hasPassword, generate }: { hasPassword: boolean
   const [copied, setCopied] = useState(false);
   const [pending, start] = useTransition();
   if (creds) {
-    const msg = `Your Frame dashboard: ${window.location.origin}/login\nUsername: ${creds.username}\nPassword: ${creds.password}\nYou can change your password on the Plan & cadence tab.`;
+    const msg = `Your Frame dashboard: ${window.location.origin}/login\nUsername: ${creds.username}\nPassword: ${creds.password}\nYou can change your password under Your info on the My week page.`;
     return (
       <div className="rounded-md border bg-muted/50 p-2 text-xs">
         <p>

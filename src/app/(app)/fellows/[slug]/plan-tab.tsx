@@ -11,14 +11,13 @@ import { Editable } from "@/components/editable";
 import { SectionTitle } from "@/components/bits";
 import { ChangePassword } from "@/components/change-password";
 import { cn } from "@/lib/utils";
-import { PLATFORM_LABEL } from "@/lib/taxonomy";
-import { PlatformIcon } from "@/components/platform-icon";
-import { addOwnAccountAction, removeOwnAccountAction, setCadenceWeekValueAction } from "../../program-actions";
+import { AccountsEditor } from "@/components/accounts-editor";
+import { setCadenceWeekValueAction } from "../../program-actions";
 
 // Profile, goals and the content cadence plan vs. what was actually published.
 // Team edits everything; the fellow edits the shared fields on their own page.
 
-export async function PlanTab({ f, isTeam, isSelf }: { f: FellowFull; isTeam: boolean; isSelf: boolean }) {
+export async function PlanTab({ f, isTeam, isSelf, children }: { f: FellowFull; isTeam: boolean; isSelf: boolean; children?: React.ReactNode }) {
   const canEdit = isTeam || isSelf;
   const [weeks, shared, edits] = await Promise.all([
     db.cadenceWeek.findMany({ where: { fellowId: f.id }, select: { week: true, long: true, short: true, note: true } }),
@@ -62,7 +61,9 @@ export async function PlanTab({ f, isTeam, isSelf }: { f: FellowFull; isTeam: bo
               }))}
             />
           </div>
-          <div className="mt-4 overflow-x-auto rounded-lg border">
+          <details className="mt-3 rounded-lg border">
+            <summary className="cursor-pointer px-3 py-2 text-xs text-muted-foreground hover:text-foreground">Week by week{isTeam && " · override targets"}</summary>
+          <div className="overflow-x-auto border-t">
             <table className="w-full text-sm">
               <thead className="bg-muted/40 text-left text-xs text-muted-foreground">
                 <tr>
@@ -101,21 +102,24 @@ export async function PlanTab({ f, isTeam, isSelf }: { f: FellowFull; isTeam: bo
               </tbody>
             </table>
           </div>
+          </details>
           <p className="mt-2 text-xs text-muted-foreground">
             Long = YouTube ≥3 min and podcasts; short = Shorts, TikToks, Reels, carousels.{f.cadenceScope === "ai-safety" && " Only AI-safety posts count for this fellow."} Posts appear after the weekly scrape.
             {isTeam && " Click a plan number to override that week (e.g. retreat week)."}
           </p>
         </section>
 
-        <section className="grid gap-4 md:grid-cols-2">
-          {field("about", "md:col-span-2")}
-          {field("interests")}
-          {field("programGoals")}
-          {field("fellowNotes", "md:col-span-2")}
-        </section>
+        {children}
       </div>
 
       <aside className="space-y-6">
+        <section className="space-y-3 rounded-lg border bg-card p-3">
+          <SectionTitle>Profile</SectionTitle>
+          {field("about")}
+          {field("interests")}
+          {field("programGoals")}
+          {field("fellowNotes")}
+        </section>
         <section className="rounded-lg border bg-card p-3">
           <SectionTitle>Cadence plan</SectionTitle>
           <div className="grid grid-cols-2 gap-3">
@@ -128,36 +132,7 @@ export async function PlanTab({ f, isTeam, isSelf }: { f: FellowFull; isTeam: bo
           {isTeam && field("cadenceScope", "mt-3")}
         </section>
 
-        {canEdit && (
-          <section className="rounded-lg border bg-card p-3">
-            <SectionTitle hint="Where your content gets tracked. New handles are picked up by the next weekly scrape.">{isSelf ? "Your accounts" : "Accounts"}</SectionTitle>
-            <ul className="space-y-1 text-sm">
-              {f.accounts.map((a) => (
-                <li key={a.id} className="flex items-center gap-2">
-                  <PlatformIcon platform={a.platform} className="size-3.5" />
-                  <span>{a.handle}</span>
-                  {a.note && <span className="truncate text-xs text-muted-foreground">{a.note}</span>}
-                  {(isTeam || !f.posts.some((p) => p.accountId === a.id)) && (
-                    <form action={removeOwnAccountAction.bind(null, f.id, a.id)} className="ml-auto">
-                      <button className="text-xs text-muted-foreground hover:text-bad">Remove</button>
-                    </form>
-                  )}
-                </li>
-              ))}
-            </ul>
-            <form action={addOwnAccountAction.bind(null, f.id)} className="mt-2 flex gap-1">
-              <select name="platform" className="h-8 rounded-md border bg-background px-1 text-xs">
-                {Object.entries(PLATFORM_LABEL).map(([k, v]) => (
-                  <option key={k} value={k}>
-                    {v}
-                  </option>
-                ))}
-              </select>
-              <input name="handle" required placeholder="@handle or link" className="h-8 min-w-0 flex-1 rounded-md border bg-background px-2 text-sm" />
-              <button className="h-8 rounded-md border px-2 text-xs">Add</button>
-            </form>
-          </section>
-        )}
+        {canEdit && <AccountsEditor fellowId={f.id} accounts={f.accounts} postAccountIds={f.posts.map((p) => p.accountId)} isTeam={isTeam} isSelf={isSelf} />}
 
         {isSelf && (
           <section className="rounded-lg border bg-card p-3">

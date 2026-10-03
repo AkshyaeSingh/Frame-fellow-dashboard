@@ -19,6 +19,8 @@ export default async function CohortPage(props: PageProps<"/cohort">) {
   if (!s) redirect("/login");
   const sp = await props.searchParams;
   const cohorts = await db.cohort.findMany({ orderBy: { startDate: "desc" } });
+  // The team sees the same board on the Content page.
+  if (s.role !== "fellow") redirect(`/content?cohort=${typeof sp.cohort === "string" ? sp.cohort : cohorts[0]!.slug}`);
   let cohort = cohorts.find((c) => c.slug === sp.cohort) ?? cohorts[0]!;
   let meId: string | undefined;
   if (s.role === "fellow") {
@@ -76,7 +78,7 @@ export default async function CohortPage(props: PageProps<"/cohort">) {
         {fellows.map((f) => {
           const views = f.posts.reduce((a, p) => a + (p.views ?? 0), 0);
           return (
-            <Link key={f.id} href={`/fellows/${f.slug}${s.role === "fellow" && f.id !== meId ? "?tab=content" : ""}`} className={cn("rounded-lg border bg-card p-3 hover:border-foreground/30", f.id === meId && "ring-2 ring-foreground/20")}>
+            <Link key={f.id} href={f.id === meId ? "/me" : `/fellows/${f.slug}`} className={cn("rounded-lg border bg-card p-3 hover:border-foreground/30", f.id === meId && "ring-2 ring-foreground/20")}>
               <div className="flex items-center gap-2">
                 <CreatorAvatar name={f.name} src={f.accounts.find((a) => a.avatarUrl)?.avatarUrl} className="size-8 text-xs" />
                 <div className="min-w-0">

@@ -8,27 +8,36 @@ export default async function AppLayout({ children }: LayoutProps<"/">) {
   const nav =
     role === "fellow"
       ? [
-          { href: "/me", label: "My dashboard" },
+          { href: "/me", label: "My week" },
           { href: "/cohort", label: "Cohort" },
         ]
-      : [
-          { href: "/", label: "Overview" },
-          ...(role === "team" ? [{ href: "/fellows", label: "Fellows" }] : []),
-          { href: "/cohort", label: "Board" },
-          { href: "/content", label: "Content" },
-          { href: "/outliers", label: "Outliers" },
-          ...(role === "team" ? [{ href: "/resources", label: "Resources" }] : []),
+      : role === "team"
+        ? [
+            { href: "/", label: "Home" },
+            { href: "/content", label: "Content" },
+            { href: "/impact", label: "Impact" },
+          ]
+        : [
+            { href: "/impact", label: "Impact" },
+            { href: "/content", label: "Content" },
+            { href: "/methodology", label: "Methodology" },
+          ];
+  const more =
+    role === "team"
+      ? [
+          { href: "/resources", label: "Resources" },
+          { href: "/data", label: "Data & scraping" },
           { href: "/methodology", label: "Methodology" },
-          ...(role === "team" ? [{ href: "/data", label: "Data" }] : []),
-        ];
+        ]
+      : [];
   return (
     <>
       <header className="sticky top-0 z-30 border-b bg-background/90 backdrop-blur">
         <div className="mx-auto flex h-12 max-w-[1400px] items-center gap-6 px-4 sm:px-6">
-          <Link href={role === "fellow" ? "/me" : "/"} className="text-sm font-semibold whitespace-nowrap">
+          <Link href={role === "fellow" ? "/me" : role === "funder" ? "/impact" : "/"} className="text-sm font-semibold whitespace-nowrap">
             Frame · Fellow Impact
           </Link>
-          <NavLinks items={nav} />
+          <NavLinks items={nav} more={more} />
           <div className="ml-auto flex items-center gap-3 text-xs text-muted-foreground">
             <span className="rounded bg-muted px-1.5 py-0.5 font-medium uppercase tracking-wide">{role === "team" ? "Team" : role === "fellow" ? "Fellow" : "Funder view"}</span>
             <span className="hidden sm:inline">{role === "fellow" ? "Private to Frame fellows" : "Internal · do not share"}</span>

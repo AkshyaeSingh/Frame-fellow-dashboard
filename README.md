@@ -4,17 +4,20 @@ Internal dashboard for tracking everything Frame fellows publish, across platfor
 
 ## What it does
 
+Three views, each built around one question.
+
+**Team: "Who needs us this week?"**
 | Page | What's there |
 |---|---|
-| **Fellows** `/fellows` | Team only. The program database: one row per fellow with status (computed from their cadence plan, or set by hand), this week and program-to-date output vs plan, last post, last 1:1, open actions, next step, interests, goals, needs, point of contact, buddy, events, Slack activity and their personal sign-in link. Click any cell to edit. **Simple** shows the essentials; **All columns** or **Custom** shows the rest. |
-| **Board** `/cohort` | The Frame content board: every fellow's output since the fellowship started, plus a feed of the latest posts. Fellows see their own cohort here. |
-| **Resources** `/resources` | Team only. Events, people, funding and resources. Tags drive each fellow's recommendations. Luma events (weekly) and event links posted in Slack (daily) are added automatically. |
-| **Overview** `/` | Portfolio KPIs by cohort, weekly output chart with fellowship windows shaded, and a per-fellow table comparing before → during → after. Also cohort-level results from the anonymous exit survey. |
-| **Fellow** `/fellows/[slug]` | **Impact:** before/during/after scorecard, trajectory, followers, outcomes with counterfactual attribution, and the fellow's own counterfactual answers. **Content:** every post, with outlier multiplier, AI-safety score, topics, CTAs and orgs. **Messaging & CTAs:** topic, CTA and org mix before vs during, plus the claim-accuracy check. **Partner fit (Trudy):** Trudy reports per brand/org. **Audience response:** sentiment and signals (changed mind, learned, action intent, pushback, questions) across scraped comments, with the most-liked examples per signal and a per-post breakdown. **Plan & cadence:** weekly targets (long/short form) vs published, per-week overrides, profile (about, interests, goals), accounts, and notes shared by the team. **Opportunities:** recommended events and resources with the reasons each was matched, plus what they went to or liked. **Forms:** curated intake, onboarding and exit answers. **Context & meetings** (team only): Granola meeting notes, decisions, action items and feedback on a timeline, plus follow-ups pulled from each meeting's next steps. |
-| **Content** `/content` | Search and filter every post across fellows, including transcripts. |
-| **Outliers** `/outliers` | Posts that beat or missed the creator's own normal (views ÷ median of their previous 20 posts), with the topics that are over-represented among them. |
-| **Methodology** `/methodology` | The seven metric layers, the counterfactual design, how each number is computed, and how this compares with what CreatorIQ, Modash, Trudy, Swayable and others track. Written for funders. |
-| **Data & scraping** `/data` | Team only. Tracked handles, Apify runs, dataset import, one-click scrape. |
+| **Home** `/` | The cohort at a glance (on track, this week vs plan, posts, AI-safety views, audience moved). **Needs attention:** fellows off track, marked needs-help or with a Slack concern, plus a one-line "also worth a look" (quiet, no 1:1 in 3+ weeks, stale actions). Then the editable fellows table (Simple / All columns / Custom). |
+| **Fellow** `/fellows/[slug]` | **Overview:** status, cadence vs plan, before/during/after impact, followers, outcomes; profile, plan, accounts and support in the sidebar. **Content:** posts, audience response, messaging & CTAs. **Notes:** meetings (Granola), decisions, action items, Slack, plus forms and Trudy. **Opportunities:** recommended events and resources. |
+| **Content** `/content` | Every post as a grid or table, with filters (cohort, fellow, platform, topic, CTA, org, AI safety, **outliers ≥2/3/5× usual**). Picking a cohort shows per-fellow totals (the content board). |
+| **Impact** `/impact` | Before/during/after across the portfolio, weekly output, exit survey. Also the funders' landing page. |
+| **More** | Resources (events, people, funding), Data & scraping, Methodology. |
+
+**Fellows: "Am I on track, and what's next?"** **My week** `/me` shows this week and the fellowship so far vs their plan, next steps from Frame (notes marked Shared), three recommendations, their latest posts, best performer and audience quotes. Profile, plan, accounts and password sit under *Your info*. **Cohort** `/cohort` is the content board for their cohort.
+
+**Funders:** Impact, Content and Methodology, plus each fellow's Overview, Content and Self-reports. No team notes, Slack or Granola.
 
 **Sign-in:** one form, username + password.
 - `admin` + `TEAM_PASSWORD`: full access and editing.

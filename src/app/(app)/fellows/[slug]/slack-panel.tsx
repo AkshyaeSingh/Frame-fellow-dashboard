@@ -14,7 +14,7 @@ export async function SlackPanel({ fellowId }: { fellowId: string }) {
       <section>
         <SectionTitle>Slack</SectionTitle>
         <p className="text-xs text-muted-foreground">
-          Not linked. Add their Slack user ID on the Plan tab or Fellows page{process.env.SLACK_BOT_TOKEN ? ", or it links automatically when their Slack name matches." : ". Slack sync needs SLACK_BOT_TOKEN."}
+          Not linked. Add their Slack user ID in Overview → Support, or in the table on Home{process.env.SLACK_BOT_TOKEN ? ", or it links automatically when their Slack name matches." : ". Slack sync needs SLACK_BOT_TOKEN."}
         </p>
       </section>
     );

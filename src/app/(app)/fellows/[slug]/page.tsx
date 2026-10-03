@@ -28,18 +28,22 @@ export async function generateMetadata(props: PageProps<"/fellows/[slug]">): Pro
   return { title: f?.name ?? "Fellow" };
 }
 
-// who: team sees everything; funders skip team-only tabs; a fellow sees their
-// own dashboard ("self") or just the content of a cohort-mate ("peer").
+// Four tabs. who: team sees everything; funders get the impact view and
+// content; a fellow sees their own content here (their home is /me) or a
+// cohort-mate's posts ("peer").
 const TABS = [
-  { key: "overview", label: "Impact", who: ["team", "funder", "self"] },
-  { key: "plan", label: "Plan & cadence", who: ["team", "self"] },
+  { key: "overview", label: "Overview", who: ["team", "funder"] },
   { key: "content", label: "Content", who: ["team", "funder", "self", "peer"] },
-  { key: "messaging", label: "Messaging & CTAs", who: ["team", "funder"] },
-  { key: "audience", label: "Audience response", who: ["team", "funder", "self"] },
-  { key: "opportunities", label: "Opportunities", who: ["team", "self"] },
-  { key: "trudy", label: "Partner fit (Trudy)", who: ["team", "funder"] },
-  { key: "forms", label: "Forms & self-reports", who: ["team", "funder"] },
-  { key: "context", label: "Context & meetings", who: ["team"] },
+  { key: "notes", label: "Notes", who: ["team"] },
+  { key: "forms", label: "Self-reports", who: ["funder"] },
+  { key: "opportunities", label: "Opportunities", who: ["team"] },
+] as const;
+
+// Content sub-views (posts are the default).
+const CONTENT_VIEWS = [
+  { key: "posts", label: "Posts" },
+  { key: "audience", label: "Audience response" },
+  { key: "messaging", label: "Messaging & CTAs" },
 ] as const;
 
 export default async function FellowPage(props: PageProps<"/fellows/[slug]">) {
@@ -57,17 +61,23 @@ export default async function FellowPage(props: PageProps<"/fellows/[slug]">) {
     const me = await db.fellow.findUnique({ where: { id: session.fellowId }, select: { cohortId: true } });
     if (me?.cohortId !== f.cohortId) redirect("/me");
   }
+  const LEGACY: Record<string, string> = { plan: "overview", audience: "content", messaging: "content", context: "notes", trudy: "notes", forms: viewer === "funder" ? "forms" : "notes" };
+  const asked = typeof sp.tab === "string" ? (LEGACY[sp.tab] ?? sp.tab) : undefined;
   const tabs = TABS.filter((t) => (t.who as readonly string[]).includes(viewer));
-  const tab = tabs.find((t) => t.key === sp.tab)?.key ?? tabs[0]!.key;
+  const tab = tabs.find((t) => t.key === asked)?.key ?? tabs[0]!.key;
+  const view = CONTENT_VIEWS.find((v) => v.key === (sp.view ?? (sp.tab === "audience" || sp.tab === "messaging" ? sp.tab : undefined)))?.key ?? "posts";
+  const views = viewer === "peer" ? [] : CONTENT_VIEWS.filter((v) => v.key !== "messaging" || viewer !== "self");
   const cmp = compareWindows(f.posts as PostLike[], f.cohort.startDate, f.cohort.endDate);
 
   return (
     <div className="space-y-6">
       {viewer === "self" ? (
-        <p className="text-sm text-muted-foreground">Your dashboard. Anything wrong? Fix it on the Plan tab, or tell the Frame team.</p>
+        <Link href="/me" className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground">
+          <ArrowLeft className="size-4" /> My week
+        </Link>
       ) : (
-        <Link href={viewer === "peer" ? "/cohort" : isTeam ? "/fellows" : "/"} className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground">
-          <ArrowLeft className="size-4" /> {viewer === "peer" ? "Cohort" : isTeam ? "Fellows" : "Portfolio"}
+        <Link href={viewer === "peer" ? "/cohort" : isTeam ? "/" : "/impact"} className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground">
+          <ArrowLeft className="size-4" /> {viewer === "peer" ? "Cohort" : isTeam ? "Home" : "Impact report"}
         </Link>
       )}
 
@@ -104,7 +114,7 @@ export default async function FellowPage(props: PageProps<"/fellows/[slug]">) {
               </a>
             );
           })}
-          {!f.accounts.length && <span className="text-xs text-muted-foreground">No handles yet{isTeam ? ", add them on the Data page" : isSelf ? ". Tell the Frame team where you post" : ""}</span>}
+          {!f.accounts.length && <span className="text-xs text-muted-foreground">No handles yet{isTeam ? ", add them in Overview → Accounts" : isSelf ? ". Add them on My week" : ""}</span>}
         </div>
       </header>
 
@@ -116,20 +126,58 @@ export default async function FellowPage(props: PageProps<"/fellows/[slug]">) {
             className={cn("-mb-px shrink-0 border-b-2 px-3 py-2 text-sm", tab === t.key ? "border-foreground font-medium" : "border-transparent text-muted-foreground hover:text-foreground")}
           >
             {t.label}
-            {t.key === "trudy" && f.trudy.length > 0 && <span className="ml-1 text-xs text-muted-foreground">{f.trudy.length}</span>}
+            
           </Link>
         ))}
       </nav>
 
-      {tab === "overview" && <OverviewTab f={f} cmp={cmp} isTeam={isTeam} />}
-      {tab === "content" && <ContentTab f={f} sp={sp} />}
-      {tab === "messaging" && <MessagingTab f={f} />}
-      {tab === "trudy" && <TrudyTab f={f} isTeam={isTeam} />}
-      {tab === "forms" && <FormsTab f={f} isTeam={isTeam} />}
-      {tab === "audience" && <AudienceTab fellowId={f.id} />}
-      {tab === "plan" && <PlanTab f={f} isTeam={isTeam} isSelf={isSelf} />}
-      {tab === "opportunities" && <OpportunitiesTab fellowId={f.id} isTeam={isTeam} canEdit={isTeam || isSelf} />}
-      {tab === "context" && isTeam && <ContextTab fellowId={f.id} />}
+      {tab === "overview" &&
+        (isTeam ? (
+          <PlanTab f={f} isTeam isSelf={false}>
+            <OverviewTab f={f} cmp={cmp} isTeam />
+          </PlanTab>
+        ) : (
+          <OverviewTab f={f} cmp={cmp} isTeam={false} />
+        ))}
+      {tab === "content" && (
+        <div className="space-y-4">
+          {views.length > 1 && (
+            <div className="flex w-fit rounded-md border p-0.5 text-xs">
+              {views.map((v) => (
+                <Link
+                  key={v.key}
+                  href={`/fellows/${f.slug}?tab=content${v.key === "posts" ? "" : `&view=${v.key}`}`}
+                  className={cn("rounded px-2.5 py-1", view === v.key ? "bg-muted font-medium" : "text-muted-foreground")}
+                >
+                  {v.label}
+                </Link>
+              ))}
+            </div>
+          )}
+          {view === "posts" && <ContentTab f={f} sp={sp} />}
+          {view === "audience" && <AudienceTab fellowId={f.id} />}
+          {view === "messaging" && <MessagingTab f={f} />}
+        </div>
+      )}
+      {tab === "notes" && isTeam && (
+        <div className="space-y-6">
+          <ContextTab fellowId={f.id} />
+          <details className="rounded-lg border">
+            <summary className="cursor-pointer px-4 py-3 text-sm font-medium">Forms & self-reports</summary>
+            <div className="border-t p-4">
+              <FormsTab f={f} isTeam />
+            </div>
+          </details>
+          <details className="rounded-lg border" open={f.trudy.length > 0 && sp.tab === "trudy"}>
+            <summary className="cursor-pointer px-4 py-3 text-sm font-medium">Partner fit (Trudy){f.trudy.length > 0 && <span className="ml-1 text-muted-foreground">· {f.trudy.length}</span>}</summary>
+            <div className="border-t p-4">
+              <TrudyTab f={f} isTeam />
+            </div>
+          </details>
+        </div>
+      )}
+      {tab === "forms" && <FormsTab f={f} isTeam={false} />}
+      {tab === "opportunities" && <OpportunitiesTab fellowId={f.id} isTeam canEdit />}
     </div>
   );
 }

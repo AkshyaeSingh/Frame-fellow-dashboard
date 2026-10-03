@@ -9,10 +9,12 @@ export function FilterForm({
   values,
   selects,
   count,
+  keep,
 }: {
   values: Record<string, string | undefined>;
   selects: { name: string; label: string; options: [string, string][]; noEmpty?: boolean }[];
   count?: string;
+  keep?: Record<string, string | undefined>; // extra params carried through as hidden inputs
 }) {
   const ref = useRef<HTMLFormElement>(null);
   return (
@@ -38,6 +40,7 @@ export function FilterForm({
           ))}
         </select>
       ))}
+      {Object.entries(keep ?? {}).map(([k, v]) => v && <input key={k} type="hidden" name={k} value={v} />)}
       <button className="sr-only">Apply</button>
       {count && <span className="ml-auto text-xs text-muted-foreground">{count}</span>}
     </form>
