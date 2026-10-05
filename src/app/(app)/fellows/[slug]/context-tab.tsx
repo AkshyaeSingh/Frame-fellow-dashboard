@@ -3,12 +3,14 @@ import { db } from "@/lib/db";
 import { shortDate } from "@/lib/format";
 import { cn } from "@/lib/utils";
 import { Chip, Empty, SectionTitle } from "@/components/bits";
-import { addNoteAction, deleteNoteAction, toggleNoteAction } from "../../team-actions";
+import { addNoteAction, deleteNoteAction, toggleNoteAction, updateNoteAction } from "../../team-actions";
+import { NoteComposer } from "@/components/note-composer";
+import { NoteEditor } from "@/components/note-editor";
 import { toggleNoteSharedAction } from "../../program-actions";
 import { SlackPanel } from "./slack-panel";
 
-// Team-only: everything we know about a fellow outside their public content —
-// interview and check-in notes (Granola), decisions, action items, feedback.
+// Team-only: everything we know about a fellow outside their public content,
+// in three places (Notion, Granola meetings, team notes) plus a quick-add box.
 
 const KINDS = [
   { key: "meeting", label: "Meeting" },
@@ -37,30 +39,62 @@ function nextSteps(body: string | null) {
 
 export async function ContextTab({ fellowId }: { fellowId: string }) {
   const notes = await db.fellowNote.findMany({ where: { fellowId }, orderBy: [{ pinned: "desc" }, { date: { sort: "desc", nulls: "last" } }, { createdAt: "desc" }] });
-  const pinned = notes.filter((n) => n.pinned);
+  const notion = notes.filter((n) => n.source === "notion");
+  const granola = notes.filter((n) => n.source === "granola" && n.kind === "meeting");
+  const team = notes.filter((n) => !notion.includes(n) && !granola.includes(n));
   const open = notes.filter((n) => n.kind === "action" && !n.done);
-  const timeline = notes.filter((n) => !n.pinned);
   // Next steps from the two most recent meetings.
-  const followUps = notes
-    .filter((n) => n.kind === "meeting")
+  const followUps = granola
+    .slice()
     .sort((a, b) => (b.date?.getTime() ?? 0) - (a.date?.getTime() ?? 0))
     .slice(0, 2)
     .flatMap((n) => nextSteps(n.body).map((s) => ({ s, n })));
 
   return (
     <div className="grid gap-6 lg:grid-cols-[1fr_20rem]">
-      <div className="space-y-6">
-        {pinned.map((n) => (
-          <NoteCard key={n.id} n={n} />
-        ))}
+      <div className="space-y-8">
         <section>
-          <SectionTitle hint="Meetings, decisions, action items and feedback, newest first. Team only unless you mark a note Shared, which shows it on the fellow's My week page.">Timeline</SectionTitle>
+          <SectionTitle
+            hint="Selection and onboarding notes from the Notion fellows database. Edit them here."
+            right={
+              <a href="#add" className="rounded-md bg-primary px-3 py-1.5 text-xs text-primary-foreground">
+                + Add note
+              </a>
+            }
+          >
+            Notion
+          </SectionTitle>
           <div className="space-y-3">
-            {timeline.map((n) => (
+            {notion.map((n) => (
               <NoteCard key={n.id} n={n} />
             ))}
-            {!notes.length && <Empty>No context yet. Add a meeting note or paste a Granola link.</Empty>}
+            {!notion.length && <Empty>Nothing from Notion yet. Paste it below with “Notion” selected.</Empty>}
           </div>
+        </section>
+
+        <section>
+          <SectionTitle hint="Interviews and 1:1s, newest first. Click to expand.">Granola meetings · {granola.length}</SectionTitle>
+          <div className="space-y-2">
+            {granola.map((n) => (
+              <NoteCard key={n.id} n={n} collapsed />
+            ))}
+            {!granola.length && <Empty>No meetings yet. Paste a Granola summary below with “Granola meeting” selected.</Empty>}
+          </div>
+        </section>
+
+        <section>
+          <SectionTitle hint="Notes, decisions, action items and feedback. Team only unless marked Shared, which shows it on the fellow's My week page.">Team notes · {team.length}</SectionTitle>
+          <div className="space-y-3">
+            {team.map((n) => (
+              <NoteCard key={n.id} n={n} />
+            ))}
+            {!team.length && <Empty>No team notes yet.</Empty>}
+          </div>
+        </section>
+
+        <section className="scroll-mt-20" id="add">
+          <SectionTitle>Add to their notes</SectionTitle>
+          <NoteComposer action={addNoteAction.bind(null, fellowId)} />
         </section>
       </div>
 
@@ -83,7 +117,7 @@ export async function ContextTab({ fellowId }: { fellowId: string }) {
         </section>
         {followUps.length > 0 && (
           <section>
-            <SectionTitle hint="From 'Next steps' in meeting notes. Turn one into an action item to track it.">Follow-ups mentioned in meetings</SectionTitle>
+            <SectionTitle hint="From 'Next steps' in the last two meetings.">Follow-ups from meetings</SectionTitle>
             <ul className="space-y-1.5 text-xs">
               {followUps.map(({ s, n }, i) => (
                 <li key={i} className="rounded-md bg-muted/60 px-2 py-1.5">
@@ -95,7 +129,6 @@ export async function ContextTab({ fellowId }: { fellowId: string }) {
           </section>
         )}
         <SlackPanel fellowId={fellowId} />
-        <NoteForm fellowId={fellowId} />
       </aside>
     </div>
   );
@@ -103,18 +136,55 @@ export async function ContextTab({ fellowId }: { fellowId: string }) {
 
 type Note = Awaited<ReturnType<typeof db.fellowNote.findMany>>[number];
 
-// One-line plain-text preview of a note body (markdown markers stripped).
-const preview = (body: string) =>
-  body
-    .split("\n")
-    .map((l) => l.replace(/^#+ |^\s*- |^\d+\. |\*\*/g, "").trim())
-    .filter(Boolean)
-    .join(" · ")
-    .slice(0, 260)
-    .trimEnd();
-
-function NoteCard({ n }: { n: Note }) {
-  const long = (n.body?.length ?? 0) > 600;
+function NoteCard({ n, collapsed }: { n: Note; collapsed?: boolean }) {
+  const actions = (
+    <div className="ml-auto flex items-center gap-3">
+      {n.url && (
+        <a href={n.url} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 hover:text-foreground">
+          Open <ExternalLink className="size-3" />
+        </a>
+      )}
+      <form action={toggleNoteSharedAction.bind(null, n.id)}>
+        <button title={n.shared ? "Visible on the fellow's My week page. Click to make team-only" : "Team-only. Click to share with the fellow"} className={cn("inline-flex items-center gap-1 hover:text-foreground", n.shared && "text-foreground")}>
+          {n.shared ? <Eye className="size-3.5" /> : <EyeOff className="size-3.5" />} {n.shared ? "Shared" : "Team only"}
+        </button>
+      </form>
+      <form action={toggleNoteAction.bind(null, n.id, "pinned")}>
+        <button title={n.pinned ? "Unpin" : "Pin to top"} className={cn("hover:text-foreground", n.pinned && "text-foreground")}>
+          <Pin className="size-3.5" />
+        </button>
+      </form>
+      {n.kind === "action" && (
+        <form action={toggleNoteAction.bind(null, n.id, "done")}>
+          <button className="inline-flex items-center gap-1 hover:text-foreground">
+            {n.done ? <CheckCircle2 className="size-3.5 text-good" /> : <Circle className="size-3.5" />} {n.done ? "Done" : "Open"}
+          </button>
+        </form>
+      )}
+      <form action={deleteNoteAction.bind(null, n.id)}>
+        <button className="hover:text-bad">Delete</button>
+      </form>
+    </div>
+  );
+  const editor = (
+    <NoteEditor title={n.title} body={n.body} done={n.done} save={updateNoteAction.bind(null, n.id)}>
+      {n.body && <Body text={n.body} />}
+    </NoteEditor>
+  );
+  if (collapsed)
+    return (
+      <details className="group rounded-lg border bg-card">
+        <summary className="flex cursor-pointer list-none flex-wrap items-center gap-2 px-4 py-2.5 text-sm [&::-webkit-details-marker]:hidden">
+          <span className="text-xs text-muted-foreground tabular-nums">{shortDate(n.date)}</span>
+          <span className="font-medium">{n.title}</span>
+          {n.shared && <Chip>Shared</Chip>}
+        </summary>
+        <div className="border-t px-4 py-3">
+          <div className="mb-2 flex text-xs text-muted-foreground">{actions}</div>
+          {editor}
+        </div>
+      </details>
+    );
   return (
     <article className={cn("rounded-lg border bg-card", n.pinned && "border-foreground/20 bg-muted/30")}>
       <header className="flex flex-wrap items-center gap-2 border-b px-4 py-2 text-xs text-muted-foreground">
@@ -122,48 +192,9 @@ function NoteCard({ n }: { n: Note }) {
         <span>{shortDate(n.date)}</span>
         {n.source !== "manual" && <span className="capitalize">· {n.source}</span>}
         {n.author && <span>· {n.author}</span>}
-        <div className="ml-auto flex items-center gap-3">
-          {n.url && (
-            <a href={n.url} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 hover:text-foreground">
-              Open <ExternalLink className="size-3" />
-            </a>
-          )}
-          <form action={toggleNoteSharedAction.bind(null, n.id)}>
-            <button title={n.shared ? "Visible on the fellow's dashboard. Click to make team-only" : "Team-only. Click to share with the fellow"} className={cn("inline-flex items-center gap-1 hover:text-foreground", n.shared && "text-foreground")}>
-              {n.shared ? <Eye className="size-3.5" /> : <EyeOff className="size-3.5" />} {n.shared ? "Shared" : "Team only"}
-            </button>
-          </form>
-          <form action={toggleNoteAction.bind(null, n.id, "pinned")}>
-            <button title={n.pinned ? "Unpin" : "Pin to top"} className={cn("hover:text-foreground", n.pinned && "text-foreground")}>
-              <Pin className="size-3.5" />
-            </button>
-          </form>
-          {n.kind === "action" && (
-            <form action={toggleNoteAction.bind(null, n.id, "done")}>
-              <button className="inline-flex items-center gap-1 hover:text-foreground">
-                {n.done ? <CheckCircle2 className="size-3.5 text-good" /> : <Circle className="size-3.5" />} {n.done ? "Done" : "Open"}
-              </button>
-            </form>
-          )}
-          <form action={deleteNoteAction.bind(null, n.id)}>
-            <button className="hover:text-bad">Delete</button>
-          </form>
-        </div>
+        {actions}
       </header>
-      <div className="px-4 py-3">
-        <h3 className={cn("text-sm font-medium", n.done && "text-muted-foreground line-through")}>{n.title}</h3>
-        {n.body &&
-          (long ? (
-            <details className="mt-1 text-sm">
-              <summary className="cursor-pointer text-muted-foreground">
-                <span>{preview(n.body)}…</span> <span className="text-xs underline">Show all</span>
-              </summary>
-              <Body text={n.body} />
-            </details>
-          ) : (
-            <Body text={n.body} />
-          ))}
-      </div>
+      <div className="px-4 py-3">{editor}</div>
     </article>
   );
 }
@@ -197,31 +228,5 @@ function Body({ text }: { text: string }) {
         );
       })}
     </div>
-  );
-}
-
-function NoteForm({ fellowId }: { fellowId: string }) {
-  const inp = "h-8 w-full rounded-md border bg-background px-2 text-sm";
-  return (
-    <section className="rounded-lg border border-dashed p-3">
-      <p className="mb-2 text-sm font-medium">Add context</p>
-      <form action={addNoteAction.bind(null, fellowId)} className="space-y-2">
-        <div className="grid grid-cols-2 gap-2">
-          <select name="kind" defaultValue="meeting" className={inp}>
-            {KINDS.map((k) => (
-              <option key={k.key} value={k.key}>
-                {k.label}
-              </option>
-            ))}
-          </select>
-          <input name="date" type="date" className={inp} />
-        </div>
-        <input name="title" required placeholder="Title (e.g. Week 4 check-in)" className={inp} />
-        <input name="url" placeholder="Link (Granola, Notion, doc…)" className={inp} />
-        <textarea name="body" placeholder="Notes: paste the Granola summary, what was decided, next steps…" className="min-h-28 w-full rounded-md border bg-background px-2 py-1 text-sm" />
-        <input name="author" placeholder="Your name" className={inp} />
-        <button className="h-8 w-full rounded-md bg-primary px-3 text-sm text-primary-foreground">Save</button>
-      </form>
-    </section>
   );
 }

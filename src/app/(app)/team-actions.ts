@@ -158,24 +158,43 @@ export async function saveNotesAction(fellowId: string, formData: FormData) {
 
 // ---------- Fellow context (meetings, decisions, action items) ----------
 
-export async function addNoteAction(fellowId: string, formData: FormData) {
+// Quick-add from the Notes tab. Only text is required: the title defaults to
+// the first line, and the source is taken from the chosen section or the link.
+export async function addNoteAction(fellowId: string, _prev: { ok: number } | undefined, formData: FormData): Promise<{ ok: number }> {
   await requireTeam();
-  const title = s(formData.get("title"));
-  if (!title) return;
+  const body = s(formData.get("body"));
+  const url = s(formData.get("url"));
+  let title = s(formData.get("title"));
+  if (!title && !body && !url) return { ok: _prev?.ok ?? 0 };
+  const firstLine = body?.split("\n").find((l) => l.trim())?.replace(/^#+\s*|^[-*]\s*/, "").trim();
+  if (!title) title = firstLine ? (firstLine.length > 90 ? `${firstLine.slice(0, 87)}…` : firstLine) : (url ?? "Note");
+  // When the first line became the title, keep the rest as the body (unless it was cut short).
+  const derived = !s(formData.get("title")) && !!firstLine && firstLine.length <= 90;
+  const rest = derived ? body!.trim().split("\n").slice(1).join("\n").trim() || null : body;
+  const picked = s(formData.get("source"));
+  const source = picked && picked !== "manual" ? picked : url?.includes("granola.ai") ? "granola" : url?.includes("notion.") ? "notion" : "manual";
   const date = s(formData.get("date"));
   await db.fellowNote.create({
     data: {
       fellowId,
       title,
-      kind: s(formData.get("kind")) ?? "note",
-      body: s(formData.get("body")),
-      url: s(formData.get("url")),
+      kind: s(formData.get("kind")) ?? (source === "granola" ? "meeting" : "note"),
+      body: rest,
+      url,
       date: date ? new Date(date) : new Date(),
       author: s(formData.get("author")),
-      source: s(formData.get("url"))?.includes("granola.ai") ? "granola" : "manual",
+      source,
     },
   });
   await refresh(fellowId);
+  return { ok: (_prev?.ok ?? 0) + 1 };
+}
+
+export async function updateNoteAction(id: string, title: string, body: string) {
+  await requireTeam();
+  const t = title.trim();
+  const n = await db.fellowNote.update({ where: { id }, data: { ...(t && { title: t }), body: body.trim() || null } });
+  await refresh(n.fellowId);
 }
 
 export async function toggleNoteAction(id: string, field: "done" | "pinned") {
