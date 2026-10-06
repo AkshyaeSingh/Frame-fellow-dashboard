@@ -17,7 +17,7 @@ import { setCadenceWeekValueAction } from "../../program-actions";
 // Profile, goals and the content cadence plan vs. what was actually published.
 // Team edits everything; the fellow edits the shared fields on their own page.
 
-export async function PlanTab({ f, isTeam, isSelf, children }: { f: FellowFull; isTeam: boolean; isSelf: boolean; children?: React.ReactNode }) {
+export async function PlanTab({ f, isTeam, isSelf, children, asideTop }: { f: FellowFull; isTeam: boolean; isSelf: boolean; children?: React.ReactNode; asideTop?: React.ReactNode }) {
   const canEdit = isTeam || isSelf;
   const [weeks, shared, edits] = await Promise.all([
     db.cadenceWeek.findMany({ where: { fellowId: f.id }, select: { week: true, long: true, short: true, note: true } }),
@@ -113,6 +113,7 @@ export async function PlanTab({ f, isTeam, isSelf, children }: { f: FellowFull; 
       </div>
 
       <aside className="space-y-6">
+        {asideTop}
         <section className="space-y-3 rounded-lg border bg-card p-3">
           <SectionTitle>Profile</SectionTitle>
           {field("about")}
@@ -143,10 +144,7 @@ export async function PlanTab({ f, isTeam, isSelf, children }: { f: FellowFull; 
 
         {isTeam && (
           <section className="space-y-3 rounded-lg border border-dashed p-3">
-            <SectionTitle hint="Team only">Support</SectionTitle>
-            {field("health")}
-            {field("nextStep")}
-            {field("needs")}
+            <SectionTitle hint="Team only">Team details</SectionTitle>
             <div className="grid grid-cols-2 gap-3">
               {field("pointOfContact")}
               {field("buddy")}

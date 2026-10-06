@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { initials } from "@/lib/format";
 import { cn } from "@/lib/utils";
 
@@ -16,15 +16,23 @@ export function CreatorAvatar({
   name,
   src,
   className,
+  style,
 }: {
   name: string;
   src?: string | null;
   className?: string;
+  style?: React.CSSProperties;
 }) {
   const [broken, setBroken] = useState(false);
+  const img = useRef<HTMLImageElement>(null);
+  // An image that failed before hydration never fires onError; check once mounted.
+  useEffect(() => {
+    const el = img.current;
+    if (el && el.complete && el.naturalWidth === 0) setBroken(true);
+  }, [src]);
   if (src && !broken) {
     // eslint-disable-next-line @next/next/no-img-element
-    return <img src={src} alt="" referrerPolicy="no-referrer" onError={() => setBroken(true)} className={cn("size-12 shrink-0 rounded-full object-cover", className)} />;
+    return <img ref={img} src={src} alt="" referrerPolicy="no-referrer" onError={() => setBroken(true)} className={cn("size-12 shrink-0 rounded-full object-cover", className)} style={style} />;
   }
   return (
     <div
@@ -33,7 +41,7 @@ export function CreatorAvatar({
         "flex size-12 shrink-0 items-center justify-center rounded-full font-display text-sm font-bold text-white",
         className,
       )}
-      style={{ backgroundColor: PALETTE[hash(name) % PALETTE.length] }}
+      style={{ backgroundColor: PALETTE[hash(name) % PALETTE.length], ...style }}
     >
       {initials(name)}
     </div>

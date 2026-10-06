@@ -1,6 +1,6 @@
 import { CalendarDays, ExternalLink, MapPin } from "lucide-react";
 import type { Resource } from "@prisma/client";
-import { shortDate } from "@/lib/format";
+import { eventDate } from "@/lib/format";
 import { cn } from "@/lib/utils";
 
 export const KIND_LABEL: Record<string, string> = { event: "Event", resource: "Resource", funding: "Funding", person: "Person", opportunity: "Opportunity" };
@@ -27,8 +27,8 @@ export function ResourceCard({ r, reasons, children, className }: { r: Resource;
           {r.date && (
             <span className="inline-flex items-center gap-1">
               <CalendarDays className="size-3" />
-              {shortDate(r.date)}
-              {r.endDate && ` – ${shortDate(r.endDate)}`}
+              {eventDate(r.date, true)}
+              {r.endDate && r.endDate.getTime() - r.date.getTime() > 86_400_000 && ` – ${eventDate(r.endDate)}`}
             </span>
           )}
           {r.location && (

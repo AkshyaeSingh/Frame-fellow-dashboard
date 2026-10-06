@@ -57,6 +57,8 @@ model Fellow {
   programShort   Int?
   cadenceNote    String?
   cadenceScope   String   @default("all") // all | ai-safety: which posts count toward cadence
+  progressNote   String? // team: how we feel their progress is, in a sentence or two
+  prospects      String? // team: where they're headed after the fellowship
   accessVersion  Int      @default(1) // bump to revoke a fellow's sign-in link and sessions
   username       String?  @unique // fellow sign-in (lowercase first name)
   passwordHash   String? // scrypt; set by the team or the fellow
@@ -72,6 +74,7 @@ model Fellow {
   resources FellowResource[]
   slack     SlackMessage[]
   edits     FellowEdit[]
+  checklist FellowGoal[]
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 }
@@ -395,4 +398,24 @@ model SyncState {
   key       String   @id
   value     String
   updatedAt DateTime @updatedAt
+}
+
+// The fellowship progress checklist (ClickUp/Monday-style status per item).
+// Default items carry a key so the progress board can line them up across fellows.
+model FellowGoal {
+  id        String   @id @default(cuid())
+  fellowId  String
+  fellow    Fellow   @relation(fields: [fellowId], references: [id], onDelete: Cascade)
+  key       String? // amplifier-comms | amplifier-delivery | cadence | connecting | toc | portfolio | prospects | custom = null
+  title     String
+  area      String   @default("program") // amplifier | content | community | program | career
+  status    String   @default("not-started") // not-started | working | on-track | at-risk | stuck | done
+  note      String?
+  order     Int      @default(0)
+  dueDate   DateTime?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([fellowId, key])
+  @@index([fellowId, order])
 }

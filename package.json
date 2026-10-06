@@ -16,7 +16,8 @@
     "import:comments": "tsx scripts/import-comments.ts",
     "import:context": "tsx scripts/import-context.ts",
     "import:run": "tsx scripts/import-run.ts",
-    "seed:program": "tsx scripts/seed-program.ts"
+    "seed:program": "tsx scripts/seed-program.ts",
+    "import:calendar": "tsx scripts/import-calendar.ts"
   },
   "prisma": {
     "seed": "tsx prisma/seed.ts"

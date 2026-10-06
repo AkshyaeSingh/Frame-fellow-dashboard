@@ -15,10 +15,11 @@ export type FieldDef = {
   help?: string;
 };
 
+// "How we feel their progress is" (team). Overrides the cadence-based status.
 export const HEALTH_OPTIONS: [string, string][] = [
-  ["on-track", "On track"],
-  ["behind", "Behind"],
-  ["needs-help", "Needs help"],
+  ["on-track", "Going well"],
+  ["behind", "Needs a nudge"],
+  ["needs-help", "Needs support"],
   ["paused", "Paused"],
 ];
 
@@ -36,7 +37,9 @@ export const FIELDS = {
   partnerOrg: { label: "Partner org", type: "text" },
   track: { label: "Track", type: "text" },
   format: { label: "Format", type: "text" },
-  health: { label: "Status", type: "select", team: true, options: HEALTH_OPTIONS, help: "Leave blank to use the cadence-based status" },
+  health: { label: "How we feel", type: "select", team: true, options: HEALTH_OPTIONS, help: "Our read on how they're doing. Leave blank to use the cadence-based status" },
+  progressNote: { label: "Why", type: "long", team: true, placeholder: "A sentence on how they're progressing" },
+  prospects: { label: "After the fellowship", type: "long", team: true, placeholder: "Where they're headed: role, funding, org…" },
   nextStep: { label: "Next step", type: "long", team: true },
   needs: { label: "What they need from us", type: "long", team: true },
   pointOfContact: { label: "Point of contact", type: "text", team: true },

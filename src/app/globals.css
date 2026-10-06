@@ -98,6 +98,12 @@
   --s7: #4a3aa7;
   --s8: #e34948;
   --good: #0f7b3e;
+  --status-done: #0f7b3e;
+  --status-good: #22a35a;
+  --status-working: #e2752e;
+  --status-risk: #f2c94c;
+  --status-stuck: #d64545;
+  --status-none: #e4e4e7;
   --bad: #c2352f;
   --muted-mark: #c9c7c1;
   --brand-accent: #b45309;
@@ -115,6 +121,7 @@
 }
 
 .dark {
+  --status-none: oklch(0.32 0 0);
   --background: oklch(0.145 0 0);
   --foreground: oklch(0.985 0 0);
   --card: oklch(0.205 0 0);

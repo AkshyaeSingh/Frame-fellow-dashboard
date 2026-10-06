@@ -57,3 +57,11 @@ export function initials(name: string) {
 export function daysAgo(n: number) {
   return new Date(Date.now() - n * 86_400_000);
 }
+
+// Event dates are shown in Pacific time (the program's calendar), with a time when there is one.
+export function eventDate(d: Date | null | undefined, withTime = false) {
+  if (!d) return "—";
+  const day = d.toLocaleDateString("en-US", { weekday: withTime ? "short" : undefined, month: "short", day: "numeric", timeZone: "America/Los_Angeles" });
+  const midday = d.getUTCHours() === 12 && d.getUTCMinutes() === 0; // all-day entries are stored at 12:00 UTC
+  return withTime && !midday ? `${day}, ${d.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit", timeZone: "America/Los_Angeles" })}` : day;
+}

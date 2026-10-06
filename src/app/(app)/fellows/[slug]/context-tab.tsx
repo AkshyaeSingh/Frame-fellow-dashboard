@@ -22,7 +22,7 @@ const KINDS = [
 const KIND_LABEL = Object.fromEntries(KINDS.map((k) => [k.key, k.label])) as Record<string, string>;
 
 // Pull "Next Steps" lines out of Granola notes so open follow-ups are visible without opening each meeting.
-function nextSteps(body: string | null) {
+export function nextSteps(body: string | null) {
   if (!body) return [];
   const lines = body.split("\n");
   const i = lines.findIndex((l) => /^#*\s*next steps\s*$/i.test(l.trim()));

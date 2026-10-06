@@ -217,3 +217,40 @@ export async function changeOwnPasswordAction(_: string | undefined, formData: F
   await db.fellowEdit.create({ data: { fellowId: s.fellowId!, field: "password", after: "changed by fellow", by: "fellow" } });
   return "saved";
 }
+
+// ---------- Progress checklist ----------
+
+async function goalFellow(id: string) {
+  return (await db.fellowGoal.findUniqueOrThrow({ where: { id }, select: { fellowId: true } })).fellowId;
+}
+
+export async function setGoalStatusAction(id: string, status: string) {
+  await requireTeam();
+  const g = await db.fellowGoal.update({ where: { id }, data: { status } });
+  await db.fellowEdit.create({ data: { fellowId: g.fellowId, field: `checklist: ${g.title}`, after: status, by: "team" } });
+  await refresh(g.fellowId);
+}
+
+export async function updateGoalAction(id: string, field: "title" | "note", raw: string) {
+  await requireTeam();
+  const v = raw.trim();
+  if (field === "title" && !v) return;
+  const g = await db.fellowGoal.update({ where: { id }, data: { [field]: v || null } });
+  await refresh(g.fellowId);
+}
+
+export async function addGoalAction(fellowId: string, formData: FormData) {
+  await requireTeam();
+  const title = String(formData.get("title") ?? "").trim();
+  if (!title) return;
+  const last = await db.fellowGoal.findFirst({ where: { fellowId }, orderBy: { order: "desc" }, select: { order: true } });
+  await db.fellowGoal.create({ data: { fellowId, title, area: String(formData.get("area") ?? "program"), order: (last?.order ?? 0) + 1 } });
+  await refresh(fellowId);
+}
+
+export async function deleteGoalAction(id: string) {
+  await requireTeam();
+  const fellowId = await goalFellow(id);
+  await db.fellowGoal.delete({ where: { id } });
+  await refresh(fellowId);
+}

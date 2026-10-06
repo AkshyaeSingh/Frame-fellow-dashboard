@@ -34,18 +34,9 @@ export const PLANS: Record<string, Plan> = {
 export type ResourceSeed = { key: string; kind: string; title: string; url?: string; date?: string; endDate?: string; location?: string; description?: string; tags: string[] };
 
 export const RESOURCES: ResourceSeed[] = [
-  { key: "frame-showcase-2026", kind: "event", title: "Frame Program Showcase (funder day)", date: "2026-11-05", location: "Lighthaven, Berkeley", description: "Full-day showcase with ~6–7 funders flown in. Pitch your theory of change and sustainable content model.", tags: ["funding", "frame", "grant", "theory of change"] },
-  { key: "frame-fellows-funders-2026", kind: "event", title: "Fellows & funders evening", date: "2026-11-04", location: "SF", tags: ["funding", "frame", "networking"] },
-  { key: "creator-finance-session", kind: "event", title: "Creator finance session: Austin (Manifund) + Maggie (FLI)", date: "2026-10-29", location: "Frame office", description: "Funding and sustainability as a creator. Tentative date.", tags: ["funding", "grant", "sustainability", "fli"] },
-  { key: "david-shore-session", kind: "event", title: "David Shore: dinner + talk", date: "2026-10-08", location: "Frame office", description: "6:00 PM dinner with fellows, 7:15 PM talk.", tags: ["political", "governance-policy", "persuasion testing", "polling"] },
-  { key: "eo-new-media-summit", kind: "event", title: "Taeyong's New Media Summit (EO)", date: "2026-10-08", location: "SF", description: "Creator/media conference hosted by EO during a16z Speedrun.", tags: ["media business models", "growth", "networking", "founder interviews"] },
-  { key: "frame-bowling", kind: "event", title: "Frame bowling / rock climbing social", date: "2026-10-02", location: "SF", tags: ["social", "frame"] },
-  { key: "postathon", kind: "event", title: "Thursday post-a-thon (lock-in)", location: "Frame office", description: "Brunch at 11, lock-in from 12, four focused bouts, social at the end. Optional.", tags: ["accountability", "short-form", "long-form", "frame"] },
   { key: "feedback-tuesdays", kind: "event", title: "Weekly content feedback session (Tuesdays)", location: "Frame office", tags: ["feedback", "scripting", "frame"] },
   { key: "hic-reno", kind: "event", title: "Humans in Control: Reno protest + teach-in", date: "2026-10-03", endDate: "2026-10-04", location: "Reno, NV", tags: ["humans-in-control", "activism", "protest-event", "documentary"] },
   { key: "hic-teach-in", kind: "event", title: "AI Reality Check nationwide teach-in", date: "2026-11-14", tags: ["humans-in-control", "activism", "campaigns"] },
-  { key: "takeoff-dc", kind: "event", title: "Takeoff Conference", date: "2026-11-13", endDate: "2026-11-15", location: "Washington, DC", description: "Travel/registration support may be available; ask Akshyae for an intro.", tags: ["governance-policy", "political", "networking"] },
-  { key: "eag-ny", kind: "event", title: "EAG New York", location: "New York", tags: ["networking", "careers-field", "funding"] },
   { key: "nyaigs", kind: "event", title: "NYC AI Governance & Safety events (Patricia Paskoff)", location: "New York", tags: ["governance-policy", "evals-demos", "networking"] },
   { key: "constellation-luma", kind: "resource", title: "Constellation & Lighthaven Luma calendars", url: "https://lu.ma", description: "Follow these to find Berkeley AI safety events and meet researchers.", tags: ["networking", "researchers", "research-explainers", "community"] },
   { key: "bytjobs", kind: "resource", title: "bytjobs.co: free editor job listings", url: "https://bytjobs.co", description: "Strong pool of editors at competitive rates.", tags: ["editing", "long-form", "hiring"] },

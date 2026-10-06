@@ -19,7 +19,7 @@ import { TrudyTab } from "./trudy-tab";
 import { FormsTab } from "./forms-tab";
 import { AudienceTab } from "./audience-tab";
 import { ContextTab } from "./context-tab";
-import { PlanTab } from "./plan-tab";
+import { ProfileOverview } from "./profile-overview";
 import { OpportunitiesTab } from "./opportunities-tab";
 
 export async function generateMetadata(props: PageProps<"/fellows/[slug]">): Promise<Metadata> {
@@ -133,9 +133,7 @@ export default async function FellowPage(props: PageProps<"/fellows/[slug]">) {
 
       {tab === "overview" &&
         (isTeam ? (
-          <PlanTab f={f} isTeam isSelf={false}>
-            <OverviewTab f={f} cmp={cmp} isTeam />
-          </PlanTab>
+          <ProfileOverview f={f} cmp={cmp} />
         ) : (
           <OverviewTab f={f} cmp={cmp} isTeam={false} />
         ))}
