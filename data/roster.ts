@@ -84,7 +84,7 @@ export const ROSTER: FellowSeed[] = [
   { name: "Reuben Adams", slug: "reuben-adams", cohort: "cohort-2", track: "Independent", format: "Long form", plannedOutput: "6 long episodes",
     accounts: [yt("ReubenJAdams", { primary: true })] },
   { name: "Jeroen Willems", slug: "jeroen-willems", cohort: "cohort-2", track: "Independent", format: "Short form", plannedOutput: "3 long-form, 20 short-form",
-    accounts: [yt("ahappierworldyt", { primary: true }), ig("ahappierworldyt"), tt("ahappierworldyt")] },
+    accounts: [yt("ahappierworldyt", { primary: true }), ig("ahappierworldyt"), ig("dontbuildmysuccessor", { note: "AI safety page" }), tt("ahappierworldyt")] },
   { name: "William Lee", slug: "william-lee", cohort: "cohort-2", track: "Independent", format: "Long form", plannedOutput: "6 investigatory long videos",
     accounts: [yt("un.william", { primary: true, note: "Korean-language channel (confirmed his)" })] },
   { name: "Strad Slater", slug: "strad-slater", cohort: "cohort-2", track: "Independent", format: "Long form", plannedOutput: "20 explanatory videos",
